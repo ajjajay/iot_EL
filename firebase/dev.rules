@@ -1,0 +1,9 @@
+{
+  "rules": {
+    // ── DEVELOPMENT rules — open read/write for all authenticated users ──────
+    // WARNING: Do NOT use these rules in production.
+    // Switch to prod.rules before going live.
+    ".read":  "auth != null",
+    ".write": "auth != null"
+  }
+}

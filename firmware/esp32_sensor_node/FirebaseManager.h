@@ -1,0 +1,75 @@
+#pragma once
+/*
+ * FirebaseManager.h
+ * Wraps Firebase ESP Client library for:
+ *   - Authentication (email/password)
+ *   - Pushing sensor readings to Realtime Database
+ *   - Receiving actuator commands (polling)
+ *   - Offline queue: if WiFi is down, readings are buffered in a ring buffer
+ *     and flushed once reconnected (prevents data loss)
+ *   - Heartbeat: periodic timestamp update so the dashboard knows the device
+ *     is alive
+ */
+
+#include <Arduino.h>
+#include <Firebase_ESP_Client.h>
+#include "SensorManager.h"
+#include "MLInference.h"
+#include "StateManager.h"
+
+// Ring buffer capacity (readings) — each entry ≈ 60 bytes
+static constexpr uint8_t OFFLINE_QUEUE_SIZE = 30;
+
+struct QueuedReading {
+    SensorReading sensor;
+    MLResult      ml;
+    DeviceState   state;
+    bool          occupied;
+};
+
+class FirebaseManager {
+public:
+    FirebaseManager(const char* apiKey, const char* databaseUrl,
+                    const char* userEmail, const char* userPassword,
+                    const char* deviceId);
+
+    // Call once in setup()
+    bool begin();
+
+    // Push latest sensor+ML data; queues locally if offline
+    void pushReading(const SensorReading& s, const MLResult& ml,
+                     DeviceState state);
+
+    // Poll Firebase for actuator commands from dashboard; returns true if relay
+    // override changed
+    bool pollCommands(RelayState& outRelay);
+
+    // Update device heartbeat + online status
+    void sendHeartbeat(DeviceState state);
+
+    // Flush offline queue — call when WiFi reconnects
+    void flushQueue();
+
+    // Update device online/offline presence
+    void setOnline(bool online);
+
+    bool isConnected() const { return _connected; }
+
+private:
+    FirebaseData   _fbData;
+    FirebaseAuth   _fbAuth;
+    FirebaseConfig _fbConfig;
+
+    const char* _deviceId;
+    bool        _connected;
+    bool        _authenticated;
+
+    QueuedReading _queue[OFFLINE_QUEUE_SIZE];
+    uint8_t       _queueHead;
+    uint8_t       _queueCount;
+
+    void _enqueue(const SensorReading& s, const MLResult& ml, DeviceState st);
+    bool _pushOne(const SensorReading& s, const MLResult& ml, DeviceState st);
+    String _devicePath() const;   // /devices/{deviceId}
+    String _readingsPath() const; // /readings/{deviceId}
+};

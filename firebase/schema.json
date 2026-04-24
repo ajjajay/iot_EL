@@ -1,0 +1,117 @@
+{
+  "_comment": "Firebase Realtime Database schema — illustrative snapshot (not a real DB dump)",
+
+  "devices": {
+    "esp32_node_01": {
+      "meta": {
+        "deviceId": "esp32_node_01",
+        "location": "Lab Room A",
+        "firmware": "1.0.0",
+        "registeredAt": 1713960000
+      },
+      "online": true,
+      "heartbeat": {
+        "ts": 1713960300,
+        "state": "MONITORING",
+        "heapFree": 213456,
+        "uptime": 300
+      },
+      "latest": {
+        "temperatureC": 27.4,
+        "humidityPct": 58.2,
+        "lightRaw": 2100,
+        "lightNorm": 0.51,
+        "riskScore": 0.12,
+        "mlLabel": 0,
+        "pNormal": 0.88,
+        "pWarning": 0.10,
+        "pCritical": 0.02,
+        "state": "MONITORING",
+        "ts": 1713960300000
+      },
+      "commands": {
+        "relayOverride": "OFF"
+      },
+      "config": {
+        "tempWarningC": 35.0,
+        "tempCriticalC": 45.0,
+        "humidityWarningPct": 80.0,
+        "lightLowThreshold": 200,
+        "mlRiskThreshold": 0.6,
+        "sensorIntervalMs": 5000
+      }
+    },
+    "esp32_node_02": {
+      "meta": {
+        "deviceId": "esp32_node_02",
+        "location": "Server Room",
+        "firmware": "1.0.0",
+        "registeredAt": 1713960010
+      },
+      "online": true,
+      "heartbeat": {
+        "ts": 1713960295,
+        "state": "ALERT",
+        "heapFree": 208120,
+        "uptime": 285
+      },
+      "latest": {
+        "temperatureC": 41.3,
+        "humidityPct": 82.1,
+        "lightRaw": 380,
+        "lightNorm": 0.09,
+        "riskScore": 0.81,
+        "mlLabel": 2,
+        "pNormal": 0.05,
+        "pWarning": 0.14,
+        "pCritical": 0.81,
+        "state": "ALERT",
+        "ts": 1713960295000
+      },
+      "commands": {
+        "relayOverride": "ON"
+      },
+      "config": {
+        "tempWarningC": 38.0,
+        "tempCriticalC": 42.0,
+        "humidityWarningPct": 75.0,
+        "lightLowThreshold": 300,
+        "mlRiskThreshold": 0.55,
+        "sensorIntervalMs": 3000
+      }
+    }
+  },
+
+  "readings": {
+    "_comment": "Time-series log — appended via Firebase push() (auto-generated key)",
+    "esp32_node_01": {
+      "-NxABCDEFGHIJ": {
+        "temperatureC": 26.8,
+        "humidityPct": 57.0,
+        "lightRaw": 2050,
+        "lightNorm": 0.50,
+        "riskScore": 0.10,
+        "mlLabel": 0,
+        "pNormal": 0.90,
+        "pWarning": 0.08,
+        "pCritical": 0.02,
+        "state": "MONITORING",
+        "ts": 1713960000000
+      }
+    }
+  },
+
+  "alerts": {
+    "_comment": "Written by dashboard or cloud function when riskScore crosses threshold",
+    "esp32_node_02": {
+      "-NxALERT001": {
+        "deviceId": "esp32_node_02",
+        "riskScore": 0.81,
+        "mlLabel": 2,
+        "temperatureC": 41.3,
+        "ts": 1713960295000,
+        "acknowledged": false
+      }
+    }
+  }
+}

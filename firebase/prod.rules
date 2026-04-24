@@ -1,0 +1,45 @@
+{
+  "rules": {
+    // ── PRODUCTION rules ──────────────────────────────────────────────────────
+    // Principle of least privilege:
+    //   - ESP32 devices write only to their own subtree
+    //   - Dashboard users read everything; write only to /commands
+    //   - No unauthenticated access anywhere
+
+    "devices": {
+      "$deviceId": {
+        // Device can write its own data; dashboard (any auth'd user) can read
+        ".read":  "auth != null",
+        ".write": "auth != null && (auth.uid == $deviceId || auth.token.role == 'admin')",
+
+        "commands": {
+          // Dashboard users can toggle actuators; devices only read commands
+          ".read":  "auth != null",
+          ".write": "auth != null"
+        },
+
+        "config": {
+          // Only admins can push remote config changes
+          ".write": "auth != null && auth.token.role == 'admin'"
+        }
+      }
+    },
+
+    "readings": {
+      "$deviceId": {
+        ".read":  "auth != null",
+        // Only the device itself (matched UID) may push readings
+        ".write": "auth != null && auth.uid == $deviceId",
+        "$readingId": {
+          ".validate": "newData.hasChildren(['temperatureC','humidityPct','ts'])"
+        }
+      }
+    },
+
+    "alerts": {
+      ".read":  "auth != null",
+      // Alerts written by Cloud Functions (admin SDK) or by device
+      ".write": "auth != null"
+    }
+  }
+}

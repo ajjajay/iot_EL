@@ -1,0 +1,68 @@
+# Environment variables — NEVER commit secrets
+.env
+.env.local
+*.env
+
+# Arduino / PlatformIO build artifacts
+firmware/.pio/
+firmware/build/
+*.hex
+*.bin
+*.elf
+*.map
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+*.egg
+pip-log.txt
+.pytest_cache/
+
+# TensorFlow / Keras saved models
+models/saved_model/
+models/*.tflite
+models/*.h5
+models/*.keras
+models/__pycache__/
+
+# Node / npm (if ever used for tooling)
+node_modules/
+npm-debug.log*
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+
+# IDE / Editor
+.vscode/settings.json
+.idea/
+*.iml
+
+# Firebase emulator data
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Logs
+*.log
+logs/
+
+# Secrets / credentials
+google-services.json
+GoogleService-Info.plist
+serviceAccountKey.json
+firebase-adminsdk*.json
+.claude/
