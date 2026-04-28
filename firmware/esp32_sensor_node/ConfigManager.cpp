@@ -59,6 +59,11 @@ void ConfigManager::_applyDefaults() {
 
     // ML
     _cfg.mlRiskThreshold = 0.6f;
+
+    // AWS IoT Core
+    strlcpy(_cfg.awsEndpoint,  "", sizeof(_cfg.awsEndpoint));
+    strlcpy(_cfg.awsThingName, "", sizeof(_cfg.awsThingName));
+    _cfg.awsEnabled = false;
 }
 
 bool ConfigManager::load() {
@@ -92,8 +97,7 @@ bool ConfigManager::load() {
 }
 
 bool ConfigManager::_parseJson(const String& json) {
-    // 1 KB is plenty for our flat config object
-    StaticJsonDocument<1024> doc;
+    StaticJsonDocument<1536> doc;
     DeserializationError err = deserializeJson(doc, json);
     if (err) {
         Serial.printf("[CFG] JSON error: %s\n", err.c_str());
@@ -126,13 +130,17 @@ bool ConfigManager::_parseJson(const String& json) {
     if (doc.containsKey("lightLowThreshold"))  _cfg.lightLowThreshold  = doc["lightLowThreshold"];
     if (doc.containsKey("mlRiskThreshold"))    _cfg.mlRiskThreshold    = doc["mlRiskThreshold"];
 
+    if (doc.containsKey("awsEndpoint"))  strlcpy(_cfg.awsEndpoint,  doc["awsEndpoint"],  sizeof(_cfg.awsEndpoint));
+    if (doc.containsKey("awsThingName")) strlcpy(_cfg.awsThingName, doc["awsThingName"], sizeof(_cfg.awsThingName));
+    if (doc.containsKey("awsEnabled"))   _cfg.awsEnabled = doc["awsEnabled"];
+
     return true;
 }
 
 bool ConfigManager::save() const {
     if (!SPIFFS.begin(true)) return false;
 
-    StaticJsonDocument<1024> doc;
+    StaticJsonDocument<1536> doc;
     doc["deviceId"]          = _cfg.deviceId;
     doc["location"]          = _cfg.location;
     doc["wifiSsid"]          = _cfg.wifiSsid;
@@ -154,6 +162,9 @@ bool ConfigManager::save() const {
     doc["humidityWarningPct"]= _cfg.humidityWarningPct;
     doc["lightLowThreshold"] = _cfg.lightLowThreshold;
     doc["mlRiskThreshold"]   = _cfg.mlRiskThreshold;
+    doc["awsEndpoint"]       = _cfg.awsEndpoint;
+    doc["awsThingName"]      = _cfg.awsThingName;
+    doc["awsEnabled"]        = _cfg.awsEnabled;
 
     File f = SPIFFS.open("/config.json", "w");
     if (!f) return false;

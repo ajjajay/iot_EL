@@ -37,6 +37,8 @@
 #include "ActuatorController.h"
 #include "FirebaseManager.h"
 #include "MLInference.h"
+#include "aws_certificates.h"
+#include "AWSIoTManager.h"
 
 // ── Module instances ──────────────────────────────────────────────────────────
 ConfigManager    config;
@@ -44,6 +46,7 @@ StateManager     fsm;
 SensorManager*   sensors  = nullptr;
 ActuatorController* actuators = nullptr;
 FirebaseManager* firebase = nullptr;
+AWSIoTManager*  awsIoT   = nullptr;
 MLInference      ml;
 
 // ── Timing ────────────────────────────────────────────────────────────────────

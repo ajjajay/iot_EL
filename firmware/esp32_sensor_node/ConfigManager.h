@@ -27,6 +27,11 @@ struct DeviceConfig {
     char firebaseUserEmail[64];
     char firebaseUserPassword[64];
 
+    // AWS IoT Core
+    char awsEndpoint[128];  // e.g. xxxxxx-ats.iot.us-east-1.amazonaws.com
+    char awsThingName[64];  // typically same as deviceId
+    bool awsEnabled;
+
     // Sensor pins
     uint8_t dhtPin;
     uint8_t ldrPin;       // ADC pin (analog)
