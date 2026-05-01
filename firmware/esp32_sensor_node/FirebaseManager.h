@@ -53,6 +53,24 @@ public:
     // Update device online/offline presence
     void setOnline(bool online);
 
+    // ── Biometric logging ────────────────────────────────────────────────────
+
+    // Log one sign-in attempt under /signins/{deviceId}/{pushId}
+    void pushSignIn(const char* userId, const char* userName,
+                    float matchScore, bool success, float anomalyScore);
+
+    // Register a new enrolled user under /users/{userId}
+    void pushEnrollment(const char* userId, const char* name);
+
+    // Log anomaly alert under /alerts/{deviceId}/{pushId}
+    void pushBiometricAlert(const char* userId, const char* alertType,
+                            float anomalyScore);
+
+    // Poll /devices/{deviceId}/commands/enroll for dashboard-initiated enrollment.
+    // Returns true and fills userId/name when a pending command is found; clears it.
+    bool pollEnrollCommand(char* outUserId, uint8_t userIdLen,
+                           char* outName,   uint8_t nameLen);
+
     bool isConnected() const { return _connected; }
 
 private:

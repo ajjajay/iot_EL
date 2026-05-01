@@ -50,8 +50,23 @@ struct DeviceConfig {
     float humidityWarningPct;
     uint16_t lightLowThreshold;   // LDR raw ADC value below which = "dark"
 
-    // ML
+    // ML (environmental inference — legacy from v1 sensor monitor)
     float mlRiskThreshold;        // 0.0–1.0; above this → ALERT state
+
+    // ── Biometric / Iris ──────────────────────────────────────────────────────
+    uint8_t  authButtonPin;        // GPIO: short-press triggers authentication
+    uint8_t  enrollButtonPin;      // GPIO: long-press + Firebase cmd → enrollment
+    uint16_t buttonDebounceMs;     // debounce window in ms
+    uint16_t buttonLongPressMs;    // hold duration (ms) to trigger enrollment mode
+
+    float    irisMatchThreshold;   // L2 distance; below this = authenticated
+    uint8_t  irisEnrollFrames;     // frames averaged per enrollment capture
+
+    uint32_t authDisplayMs;        // how long AUTHENTICATED/REJECTED LED shows (ms)
+
+    // ── Anomaly detection ─────────────────────────────────────────────────────
+    float    anomalyScoreThreshold; // 0.0–1.0; above this → ALERT + agent call
+    uint32_t alertCooldownMs;       // min ms between same-type anomaly alerts
 };
 
 class ConfigManager {

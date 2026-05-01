@@ -2,13 +2,17 @@
 
 const char* stateToString(DeviceState s) {
     switch (s) {
-        case DeviceState::INIT:       return "INIT";
-        case DeviceState::CONNECTING: return "CONNECTING";
-        case DeviceState::READY:      return "READY";
-        case DeviceState::MONITORING: return "MONITORING";
-        case DeviceState::ALERT:      return "ALERT";
-        case DeviceState::ERROR:      return "ERROR";
-        default:                      return "UNKNOWN";
+        case DeviceState::INIT:           return "INIT";
+        case DeviceState::CONNECTING:     return "CONNECTING";
+        case DeviceState::READY:          return "READY";
+        case DeviceState::MONITORING:     return "MONITORING";
+        case DeviceState::ALERT:          return "ALERT";
+        case DeviceState::ERROR:          return "ERROR";
+        case DeviceState::ENROLLING:      return "ENROLLING";
+        case DeviceState::AUTHENTICATING: return "AUTHENTICATING";
+        case DeviceState::AUTHENTICATED:  return "AUTHENTICATED";
+        case DeviceState::REJECTED:       return "REJECTED";
+        default:                          return "UNKNOWN";
     }
 }
 
@@ -53,16 +57,31 @@ bool StateManager::_isLegal(DeviceState from, DeviceState to) const {
             return to == DeviceState::MONITORING;
 
         case DeviceState::MONITORING:
-            // Normal cycle + alert escalation
-            return to == DeviceState::MONITORING ||
-                   to == DeviceState::ALERT       ||
-                   to == DeviceState::CONNECTING;   // WiFi lost → reconnect
+            return to == DeviceState::MONITORING    ||  // self (no-op cycle)
+                   to == DeviceState::ALERT         ||  // anomaly detected
+                   to == DeviceState::CONNECTING    ||  // WiFi lost
+                   to == DeviceState::ENROLLING     ||  // enrollment triggered
+                   to == DeviceState::AUTHENTICATING;   // auth triggered
+
+        case DeviceState::ENROLLING:
+            return to == DeviceState::MONITORING;       // done or timed out
+
+        case DeviceState::AUTHENTICATING:
+            return to == DeviceState::AUTHENTICATED ||
+                   to == DeviceState::REJECTED;
+
+        case DeviceState::AUTHENTICATED:
+            return to == DeviceState::ALERT       ||   // anomaly follow-up
+                   to == DeviceState::MONITORING;      // display timeout
+
+        case DeviceState::REJECTED:
+            return to == DeviceState::MONITORING;
 
         case DeviceState::ALERT:
-            return to == DeviceState::MONITORING;   // alert cleared
+            return to == DeviceState::MONITORING;
 
         case DeviceState::ERROR:
-            return to == DeviceState::INIT;         // after restart
+            return to == DeviceState::INIT;
 
         default:
             return false;

@@ -79,7 +79,7 @@ Create one per device. Upload via Arduino IDE ESP32 SPIFFS Uploader:
 ```json
 {
   "deviceId":    "esp32_node_01",
-  "location":    "Lab Room A",
+  "location":    "Entrance A",
   "wifiSsid":    "YourWiFi",
   "wifiPassword":"YourPassword",
   "firebaseApiKey":    "AIzaSy...",
@@ -92,13 +92,20 @@ Create one per device. Upload via Arduino IDE ESP32 SPIFFS Uploader:
   "ledPin":      2,
   "dhtType":     22,
   "sensorIntervalMs":    5000,
-  "firebaseSyncMs":      10000,
   "heartbeatIntervalMs": 30000,
   "tempWarningC":        35.0,
   "tempCriticalC":       45.0,
   "humidityWarningPct":  80.0,
-  "lightLowThreshold":   200,
-  "mlRiskThreshold":     0.6
+  "mlRiskThreshold":     0.6,
+  "awsEnabled":          true,
+  "awsEndpoint":         "xxxxxxxxxxxxxx-ats.iot.us-east-1.amazonaws.com",
+  "awsThingName":        "esp32_node_01",
+  "authButtonPin":       15,
+  "irisMatchThreshold":  0.30,
+  "irisEnrollFrames":    5,
+  "authDisplayMs":       3000,
+  "anomalyScoreThreshold": 0.60,
+  "alertCooldownMs":     30000
 }
 ```
 
@@ -106,29 +113,106 @@ Place at `firmware/esp32_sensor_node/data/config.json` then:
 - Arduino IDE: Sketch → Show Sketch Folder → create `data/` → paste file
 - Tools → ESP32 Sketch Data Upload (requires plugin)
 
-### 8. Verify Connection
+### 8. AWS IoT Core setup (for biometric event routing)
+
+1. **Create a Thing** in AWS Console → IoT Core → Manage → Things → Create
+   - Name: `esp32_node_01` (match `awsThingName` in config.json)
+
+2. **Create a Certificate** → download three files:
+   - Amazon Root CA 1
+   - Device certificate (.crt)
+   - Private key (.key)
+   Paste each into `firmware/esp32_sensor_node/aws_certificates.h`
+
+3. **Create an IoT Policy** and attach it to the certificate:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": ["iot:Connect","iot:Publish","iot:Subscribe","iot:Receive"],
+    "Resource": "arn:aws:iot:*:*:*"
+  }]
+}
+```
+
+4. **Create IoT Rules** to route biometric alerts to Lambda:
+   - **Rule 1 — Biometric events** (sign-in telemetry → DynamoDB or S3):
+     - SQL: `SELECT * FROM 'iot/+/biometric/signin'`
+     - Action: Lambda (your anomaly ML function) or DynamoDB
+   - **Rule 2 — Anomaly alerts** (trigger Bedrock Agent → user notification):
+     - SQL: `SELECT * FROM 'iot/+/biometric/alert'`
+     - Action: Lambda → `BiometricAlertAgent`
+
+5. **Lambda `BiometricAlertAgent`** (Node.js example outline):
+```javascript
+exports.handler = async (event) => {
+  const { deviceId, userId, alertType, anomalyScore } = event;
+  // Option A: Invoke Bedrock Agent
+  const bedrockClient = new BedrockAgentRuntimeClient({ region: "us-east-1" });
+  await bedrockClient.send(new InvokeAgentCommand({
+    agentId: process.env.BEDROCK_AGENT_ID,
+    agentAliasId: process.env.BEDROCK_AGENT_ALIAS_ID,
+    sessionId: `${deviceId}-${Date.now()}`,
+    inputText: `Biometric anomaly on device ${deviceId}: ${alertType} for user ${userId}. Score: ${anomalyScore}. Notify the user.`
+  }));
+  // Option B: Direct SNS
+  await snsClient.send(new PublishCommand({
+    TopicArn: process.env.ALERT_SNS_TOPIC_ARN,
+    Subject:  `Security Alert — ${alertType}`,
+    Message:  `Device ${deviceId} flagged user ${userId} for ${alertType} (score ${(anomalyScore*100).toFixed(0)}%)`
+  }));
+  // Publish ACK back to ESP32 so it can log confirmation
+  await iotClient.send(new PublishCommand({
+    topic:   `iot/${deviceId}/ai/alerts`,
+    payload: JSON.stringify({ userId, alertType, ack: true })
+  }));
+};
+```
+
+### 9. Enroll users via the dashboard
+
+1. Open `frontend/index.html`
+2. Go to **Enrolled Users → Enroll New User**
+3. Select the device, enter a User ID and Full Name
+4. Click **Send Enrollment Command**
+5. The user should look at the camera within 30 seconds
+6. The device captures 5 averaged iris frames and saves the template to SPIFFS
+
+### 10. Verify Connection
 
 Open Serial Monitor (115200 baud) after flashing:
 ```
-[CFG] Loaded config for device 'esp32_node_01' @ 'Lab Room A'
-[ML]  Model loaded OK — arena used: 4200 / 8192 bytes
+=== Iris Biometric Access Control — Boot ===
+[CFG] Loaded config for device 'esp32_node_01' @ 'Entrance A'
+[CAM] Ready
+[BIO] Ready — 0 user(s) enrolled
 [WiFi] Connected — IP: 192.168.1.42  RSSI: -62 dBm
 [FB]  Authenticated
 [FB]  Device 'esp32_node_01' registered
+[AWS] Connected to AWS IoT Core
 [FSM] INIT → CONNECTING  (after 0ms, transition #1)
-[FSM] CONNECTING → READY (after 3210ms, transition #2)
-[FSM] READY → MONITORING (after 10ms, transition #3)
-[SENS] T=24.3°C  H=58.1%  L=2048
-[ML]  n=0.912 w=0.072 c=0.016 → risk=0.052 label=0
-[FB]  Pushed: T=24.3 H=58.1 L=2048 risk=0.052
+[FSM] READY → MONITORING (after 3210ms, transition #3)
+[BOOT] Device 'esp32_node_01' ready — 0 user(s) enrolled
+--- (press button to authenticate) ---
+[BTN] Short press — starting authentication
+[FSM] MONITORING → AUTHENTICATING
+[CAM] Frame grab OK
+[BIO] Match: john_doe score=0.1432 thresh=0.3000 → PASS
+[ANOM] score=0.082  fail=0.00 prox=0.21 freq=0.00
+[FB]  Sign-in logged: user=john_doe success=Y score=0.143
+[AWS] Biometric event: user=john_doe success=Y score=0.143
+[FSM] AUTHENTICATING → AUTHENTICATED
 ```
 
-### Troubleshooting Auth Errors
+### Troubleshooting
 
 | Error | Fix |
 |---|---|
 | `auth/invalid-api-key` | Double-check `firebaseApiKey` in config.json |
 | `auth/user-not-found` | Create the device user in Firebase Console → Auth |
-| `auth/wrong-password` | Verify password in config.json matches Auth user |
 | `Permission denied` | Check database rules — switch to dev.rules for testing |
-| `Network error` | Check WiFi credentials; ensure Firebase URL has no trailing `/` |
+| `[CAM] Init failed` | Check camera pins; ensure board is AI Thinker ESP32-CAM |
+| `[BIO] SPIFFS mount failed` | Use "Huge APP" partition scheme; run SPIFFS data upload |
+| `[AWS] MQTT connect failed` | Verify endpoint, certificate, and policy in aws_certificates.h |
+| Match score always high (>0.4) | Re-enroll in consistent lighting; ensure IR light source is present |

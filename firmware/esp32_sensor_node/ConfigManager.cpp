@@ -57,13 +57,26 @@ void ConfigManager::_applyDefaults() {
     _cfg.humidityWarningPct  = 80.0f;
     _cfg.lightLowThreshold   = 200;
 
-    // ML
+    // ML (environmental)
     _cfg.mlRiskThreshold = 0.6f;
 
     // AWS IoT Core
     strlcpy(_cfg.awsEndpoint,  "", sizeof(_cfg.awsEndpoint));
     strlcpy(_cfg.awsThingName, "", sizeof(_cfg.awsThingName));
     _cfg.awsEnabled = false;
+
+    // Biometric / Iris
+    _cfg.authButtonPin      = 15;     // GPIO 15 — short press → authenticate
+    _cfg.enrollButtonPin    = 15;     // same pin, long press → enter enroll mode
+    _cfg.buttonDebounceMs   = 50;
+    _cfg.buttonLongPressMs  = 3000;   // 3 s hold → enrollment mode
+    _cfg.irisMatchThreshold = 0.30f;  // L2 distance threshold
+    _cfg.irisEnrollFrames   = 5;      // frames to average during enrollment
+    _cfg.authDisplayMs      = 3000;   // 3 s display of AUTHENTICATED/REJECTED
+
+    // Anomaly detection
+    _cfg.anomalyScoreThreshold = 0.60f;
+    _cfg.alertCooldownMs       = 30000UL;
 }
 
 bool ConfigManager::load() {
@@ -134,13 +147,26 @@ bool ConfigManager::_parseJson(const String& json) {
     if (doc.containsKey("awsThingName")) strlcpy(_cfg.awsThingName, doc["awsThingName"], sizeof(_cfg.awsThingName));
     if (doc.containsKey("awsEnabled"))   _cfg.awsEnabled = doc["awsEnabled"];
 
+    // Biometric
+    if (doc.containsKey("authButtonPin"))      _cfg.authButtonPin      = doc["authButtonPin"];
+    if (doc.containsKey("enrollButtonPin"))    _cfg.enrollButtonPin    = doc["enrollButtonPin"];
+    if (doc.containsKey("buttonDebounceMs"))   _cfg.buttonDebounceMs   = doc["buttonDebounceMs"];
+    if (doc.containsKey("buttonLongPressMs"))  _cfg.buttonLongPressMs  = doc["buttonLongPressMs"];
+    if (doc.containsKey("irisMatchThreshold")) _cfg.irisMatchThreshold = doc["irisMatchThreshold"];
+    if (doc.containsKey("irisEnrollFrames"))   _cfg.irisEnrollFrames   = doc["irisEnrollFrames"];
+    if (doc.containsKey("authDisplayMs"))      _cfg.authDisplayMs      = doc["authDisplayMs"];
+
+    // Anomaly
+    if (doc.containsKey("anomalyScoreThreshold")) _cfg.anomalyScoreThreshold = doc["anomalyScoreThreshold"];
+    if (doc.containsKey("alertCooldownMs"))        _cfg.alertCooldownMs       = doc["alertCooldownMs"];
+
     return true;
 }
 
 bool ConfigManager::save() const {
     if (!SPIFFS.begin(true)) return false;
 
-    StaticJsonDocument<1536> doc;
+    StaticJsonDocument<2048> doc;
     doc["deviceId"]          = _cfg.deviceId;
     doc["location"]          = _cfg.location;
     doc["wifiSsid"]          = _cfg.wifiSsid;
@@ -165,6 +191,16 @@ bool ConfigManager::save() const {
     doc["awsEndpoint"]       = _cfg.awsEndpoint;
     doc["awsThingName"]      = _cfg.awsThingName;
     doc["awsEnabled"]        = _cfg.awsEnabled;
+
+    doc["authButtonPin"]         = _cfg.authButtonPin;
+    doc["enrollButtonPin"]       = _cfg.enrollButtonPin;
+    doc["buttonDebounceMs"]      = _cfg.buttonDebounceMs;
+    doc["buttonLongPressMs"]     = _cfg.buttonLongPressMs;
+    doc["irisMatchThreshold"]    = _cfg.irisMatchThreshold;
+    doc["irisEnrollFrames"]      = _cfg.irisEnrollFrames;
+    doc["authDisplayMs"]         = _cfg.authDisplayMs;
+    doc["anomalyScoreThreshold"] = _cfg.anomalyScoreThreshold;
+    doc["alertCooldownMs"]       = _cfg.alertCooldownMs;
 
     File f = SPIFFS.open("/config.json", "w");
     if (!f) return false;

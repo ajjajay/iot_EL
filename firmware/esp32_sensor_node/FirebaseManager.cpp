@@ -166,6 +166,96 @@ void FirebaseManager::_enqueue(const SensorReading& s, const MLResult& ml,
     _queueCount++;
 }
 
+// ── Biometric logging ─────────────────────────────────────────────────────────
+
+void FirebaseManager::pushSignIn(const char* userId, const char* userName,
+                                  float matchScore, bool success,
+                                  float anomalyScore) {
+    if (!_connected || !Firebase.ready()) {
+        Serial.println("[FB] Offline — sign-in log dropped");
+        return;
+    }
+
+    FirebaseJson data;
+    data.set("userId",      userId);
+    data.set("userName",    userName);
+    data.set("matchScore",  matchScore);
+    data.set("success",     success);
+    data.set("anomalyScore", anomalyScore);
+    data.set("ts",          (uint32_t)(millis() / 1000));
+
+    String path = String("/signins/") + _deviceId;
+    Firebase.RTDB.push(&_fbData, path.c_str(), &data);
+
+    Serial.printf("[FB] Sign-in logged: user=%s success=%s score=%.3f\n",
+                  userId, success ? "Y" : "N", matchScore);
+}
+
+void FirebaseManager::pushEnrollment(const char* userId, const char* name) {
+    if (!_connected || !Firebase.ready()) return;
+
+    FirebaseJson data;
+    data.set("userId",      userId);
+    data.set("name",        name);
+    data.set("deviceId",    _deviceId);
+    data.set("enrolledAt",  (uint32_t)(millis() / 1000));
+
+    String path = String("/users/") + userId;
+    Firebase.RTDB.updateNode(&_fbData, path.c_str(), &data);
+
+    Serial.printf("[FB] Enrollment logged: user=%s name=%s\n", userId, name);
+}
+
+void FirebaseManager::pushBiometricAlert(const char* userId,
+                                          const char* alertType,
+                                          float anomalyScore) {
+    if (!_connected || !Firebase.ready()) return;
+
+    FirebaseJson data;
+    data.set("deviceId",    _deviceId);
+    data.set("userId",      userId);
+    data.set("alertType",   alertType);
+    data.set("anomalyScore", anomalyScore);
+    data.set("acknowledged", false);
+    data.set("ts",          (uint32_t)(millis() / 1000));
+
+    String path = String("/alerts/") + _deviceId;
+    Firebase.RTDB.push(&_fbData, path.c_str(), &data);
+
+    Serial.printf("[FB] Alert logged: type=%s user=%s score=%.3f\n",
+                  alertType, userId, anomalyScore);
+}
+
+bool FirebaseManager::pollEnrollCommand(char* outUserId, uint8_t userIdLen,
+                                         char* outName,   uint8_t nameLen) {
+    if (!_connected || !Firebase.ready()) return false;
+
+    String pendingPath = _devicePath() + "/commands/enroll/pending";
+    if (!Firebase.RTDB.getBool(&_fbData, pendingPath.c_str())) return false;
+    if (!_fbData.boolData()) return false;
+
+    // Read userId
+    String uidPath = _devicePath() + "/commands/enroll/userId";
+    if (!Firebase.RTDB.getString(&_fbData, uidPath.c_str())) return false;
+    strlcpy(outUserId, _fbData.stringData().c_str(), userIdLen);
+
+    // Read name
+    String namePath = _devicePath() + "/commands/enroll/name";
+    if (Firebase.RTDB.getString(&_fbData, namePath.c_str())) {
+        strlcpy(outName, _fbData.stringData().c_str(), nameLen);
+    } else {
+        strlcpy(outName, outUserId, nameLen);  // fall back to userId as name
+    }
+
+    // Clear the pending flag so it doesn't trigger again
+    Firebase.RTDB.setBool(&_fbData, pendingPath.c_str(), false);
+
+    Serial.printf("[FB] Enroll command: userId=%s name=%s\n", outUserId, outName);
+    return true;
+}
+
+// ── Path helpers ──────────────────────────────────────────────────────────────
+
 String FirebaseManager::_devicePath() const {
     return String("/devices/") + _deviceId;
 }

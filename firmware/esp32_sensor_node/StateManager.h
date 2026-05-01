@@ -18,12 +18,16 @@
 #include <Arduino.h>
 
 enum class DeviceState : uint8_t {
-    INIT       = 0,
-    CONNECTING = 1,
-    READY      = 2,
-    MONITORING = 3,
-    ALERT      = 4,
-    ERROR      = 5
+    INIT             = 0,
+    CONNECTING       = 1,
+    READY            = 2,
+    MONITORING       = 3,   // idle — waiting for auth trigger
+    ALERT            = 4,   // anomaly detected, alert dispatched
+    ERROR            = 5,
+    ENROLLING        = 6,   // capturing iris for new user template
+    AUTHENTICATING   = 7,   // iris captured, running match
+    AUTHENTICATED    = 8,   // access granted (relay energised)
+    REJECTED         = 9    // no match — access denied
 };
 
 // Human-readable labels (useful for Serial and Firebase logging)

@@ -50,6 +50,20 @@ public:
     // Returns true (once) if a relay command arrived via MQTT since last call
     bool getRelayCommand(RelayState& outRelay);
 
+    // ── Biometric events ─────────────────────────────────────────────────────
+
+    // Publish sign-in result to iot/{thingName}/biometric/signin
+    // AWS IoT Rule → Lambda → DynamoDB + anomaly ML pipeline
+    void publishBiometricEvent(const char* userId, float matchScore, bool success);
+
+    // Publish anomaly alert JSON (pre-formatted by AlertManager) to
+    // iot/{thingName}/biometric/alert → IoT Rule → Lambda → Bedrock Agent
+    bool publishAlertJson(const String& alertJson);
+
+    // Returns true (once) when the Bedrock Agent sends an ACK on
+    // iot/{thingName}/ai/alerts  { "userId": "...", "alertType": "...", "ack": true }
+    bool getAgentAck(char* outUserId, char* outAlertType);
+
     bool isConnected() const;
 
 private:
@@ -61,6 +75,10 @@ private:
 
     bool       _relayPending;
     RelayState _pendingRelay;
+
+    bool _agentAckPending;
+    char _agentAckUserId[32];
+    char _agentAckType[32];
 
     bool _reconnect();
     void _onMessage(char* topic, byte* payload, unsigned int len);

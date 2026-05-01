@@ -7,8 +7,10 @@ AWSIoTManager::AWSIoTManager(const char* endpoint, const char* thingName,
                                const char* rootCA, const char* deviceCert,
                                const char* privateKey)
     : _mqtt(_wifiClient), _endpoint(endpoint), _thingName(thingName),
-      _relayPending(false)
+      _relayPending(false), _agentAckPending(false)
 {
+    _agentAckUserId[0] = '\0';
+    _agentAckType[0]   = '\0';
     _instance = this;
     _wifiClient.setCACert(rootCA);
     _wifiClient.setCertificate(deviceCert);
@@ -44,13 +46,15 @@ bool AWSIoTManager::_reconnect() {
 
     Serial.println(" connected");
 
-    // Subscribe to command and shadow delta topics
+    // Subscribe to command, shadow delta, and AI agent ACK topics
     String cmdTopic    = String("iot/") + _thingName + "/commands";
     String shadowDelta = String("$aws/things/") + _thingName + "/shadow/update/delta";
+    String aiAlerts    = String("iot/") + _thingName + "/ai/alerts";
     _mqtt.subscribe(cmdTopic.c_str());
     _mqtt.subscribe(shadowDelta.c_str());
+    _mqtt.subscribe(aiAlerts.c_str());
 
-    Serial.printf("[AWS] Subscribed to %s and shadow/delta\n", cmdTopic.c_str());
+    Serial.printf("[AWS] Subscribed to commands, shadow/delta, ai/alerts\n");
     return true;
 }
 
@@ -133,6 +137,51 @@ bool AWSIoTManager::isConnected() const {
     return _mqtt.connected();
 }
 
+// ── Biometric methods ─────────────────────────────────────────────────────────
+
+void AWSIoTManager::publishBiometricEvent(const char* userId,
+                                           float matchScore, bool success) {
+    if (!_mqtt.connected()) return;
+
+    StaticJsonDocument<256> doc;
+    doc["deviceId"]  = _thingName;
+    doc["userId"]    = userId;
+    doc["matchScore"] = matchScore;
+    doc["success"]   = success;
+    doc["ts"]        = (uint32_t)(millis() / 1000);
+
+    char buf[256];
+    size_t len = serializeJson(doc, buf);
+
+    String topic = String("iot/") + _thingName + "/biometric/signin";
+    if (!_mqtt.publish(topic.c_str(), buf, len)) {
+        Serial.println("[AWS] Biometric event publish failed");
+    } else {
+        Serial.printf("[AWS] Biometric event: user=%s success=%s score=%.3f\n",
+                      userId, success ? "Y" : "N", matchScore);
+    }
+}
+
+bool AWSIoTManager::publishAlertJson(const String& alertJson) {
+    if (!_mqtt.connected()) return false;
+
+    String topic = String("iot/") + _thingName + "/biometric/alert";
+    bool ok = _mqtt.publish(topic.c_str(),
+                            (const uint8_t*)alertJson.c_str(), alertJson.length());
+    if (!ok) Serial.println("[AWS] Alert publish failed (buffer full?)");
+    return ok;
+}
+
+bool AWSIoTManager::getAgentAck(char* outUserId, char* outAlertType) {
+    if (!_agentAckPending) return false;
+    strlcpy(outUserId,    _agentAckUserId, 32);
+    strlcpy(outAlertType, _agentAckType,   32);
+    _agentAckPending  = false;
+    _agentAckUserId[0] = '\0';
+    _agentAckType[0]   = '\0';
+    return true;
+}
+
 // ── Static callback trampoline ─────────────────────────────────────────────────
 
 void AWSIoTManager::_staticCallback(char* topic, byte* payload, unsigned int len) {
@@ -160,8 +209,6 @@ void AWSIoTManager::_onMessage(char* topic, byte* payload, unsigned int len) {
     }
 
     // Shadow delta: $aws/things/{thingName}/shadow/update/delta
-    // AWS sends this when the desired state differs from the reported state.
-    // Payload: { "state": { "relayOverride": "ON"|"OFF"|"AUTO" } }
     String shadowDelta = String("$aws/things/") + _thingName + "/shadow/update/delta";
     if (topicStr == shadowDelta) {
         const char* relay = doc["state"]["relayOverride"];
@@ -169,5 +216,20 @@ void AWSIoTManager::_onMessage(char* topic, byte* payload, unsigned int len) {
         if (strcmp(relay, "ON")  == 0) { _pendingRelay = RelayState::ON;  _relayPending = true; }
         if (strcmp(relay, "OFF") == 0) { _pendingRelay = RelayState::OFF; _relayPending = true; }
         Serial.printf("[AWS] Shadow delta relay: %s\n", relay);
+    }
+
+    // AI agent ACK: iot/{thingName}/ai/alerts
+    // Bedrock Agent publishes here after delivering user notification.
+    // Payload: { "userId": "...", "alertType": "...", "ack": true }
+    String aiAlerts = String("iot/") + _thingName + "/ai/alerts";
+    if (topicStr == aiAlerts) {
+        bool ack = doc["ack"] | false;
+        if (!ack) return;
+        const char* uid  = doc["userId"]    | "";
+        const char* type = doc["alertType"] | "";
+        strlcpy(_agentAckUserId, uid,  sizeof(_agentAckUserId));
+        strlcpy(_agentAckType,   type, sizeof(_agentAckType));
+        _agentAckPending = true;
+        Serial.printf("[AWS] Agent ACK received: user=%s type=%s\n", uid, type);
     }
 }
