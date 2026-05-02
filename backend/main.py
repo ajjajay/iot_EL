@@ -17,6 +17,10 @@ Endpoints:
 import os
 from contextlib import asynccontextmanager
 
+# Load .env file when running locally (no-op in Docker/Render where vars are injected)
+from dotenv import load_dotenv
+load_dotenv()  # looks for backend/.env relative to CWD, or repo root .env
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 

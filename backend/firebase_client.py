@@ -24,37 +24,62 @@ from firebase_admin import credentials, db
 def _init_firebase() -> None:
     """
     Initialise the Firebase Admin SDK from env vars.
-    Supports two credential formats:
-      1. FIREBASE_SERVICE_ACCOUNT_JSON — raw JSON string (preferred for Render secret files)
-      2. FIREBASE_SERVICE_ACCOUNT_B64  — base64-encoded JSON (for env vars that reject newlines)
+
+    Credential loading order (most reliable first):
+      1. FIREBASE_SERVICE_ACCOUNT_B64  — base64-encoded JSON  ← RECOMMENDED for Render
+      2. FIREBASE_SERVICE_ACCOUNT_JSON — raw JSON string
+
+    Render can mangle raw JSON (newlines in private key, quote escaping).
+    Base64 is a plain alphanumeric string — always safe.
     """
     if firebase_admin._apps:
         return  # already initialised
 
-    database_url = os.getenv("FIREBASE_DATABASE_URL", "")
+    database_url = os.getenv("FIREBASE_DATABASE_URL", "").strip()
     if not database_url:
         raise EnvironmentError(
             "FIREBASE_DATABASE_URL env var is not set. "
             "Add it in Render → Environment → Environment Variables."
         )
 
-    # Try raw JSON first
-    sa_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "")
-    if not sa_json:
-        # Try base64 fallback
-        sa_b64 = os.getenv("FIREBASE_SERVICE_ACCOUNT_B64", "")
-        if sa_b64:
+    sa_json = ""
+
+    # 1. Try base64 first — most reliable when pasting into Render
+    sa_b64 = os.getenv("FIREBASE_SERVICE_ACCOUNT_B64", "").strip()
+    if sa_b64:
+        try:
             sa_json = base64.b64decode(sa_b64).decode("utf-8")
+            print("[FIREBASE] Using base64-encoded service account credentials")
+        except Exception as e:
+            raise EnvironmentError(
+                f"FIREBASE_SERVICE_ACCOUNT_B64 is set but could not be base64-decoded: {e}"
+            )
+
+    # 2. Fall back to raw JSON string
+    if not sa_json:
+        sa_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "").strip()
+        if sa_json:
+            print("[FIREBASE] Using raw JSON service account credentials")
 
     if not sa_json:
         raise EnvironmentError(
-            "Firebase credentials not found. Set either:\n"
-            "  FIREBASE_SERVICE_ACCOUNT_JSON — paste the full service account JSON\n"
-            "  FIREBASE_SERVICE_ACCOUNT_B64  — base64-encoded version of the JSON"
+            "Firebase credentials not found. Set one of these in Render → Environment:\n"
+            "  FIREBASE_SERVICE_ACCOUNT_B64  — RECOMMENDED: base64-encode your serviceAccountKey.json\n"
+            "    PowerShell: [Convert]::ToBase64String([IO.File]::ReadAllBytes('serviceAccountKey.json'))\n"
+            "    Linux/Mac:  base64 -w 0 serviceAccountKey.json\n"
+            "  FIREBASE_SERVICE_ACCOUNT_JSON — paste the raw JSON (may fail if Render mangles quotes/newlines)"
         )
 
-    sa_dict = json.loads(sa_json)
-    cred    = credentials.Certificate(sa_dict)
+    try:
+        sa_dict = json.loads(sa_json)
+    except json.JSONDecodeError as e:
+        raise EnvironmentError(
+            f"Firebase service account JSON is invalid: {e}\n"
+            "Tip: Use FIREBASE_SERVICE_ACCOUNT_B64 (base64-encoded) instead of raw JSON "
+            "to avoid Render mangling the private key newlines and quotes."
+        )
+
+    cred = credentials.Certificate(sa_dict)
     firebase_admin.initialize_app(cred, {"databaseURL": database_url})
     print(f"[FIREBASE] Initialised for project: {sa_dict.get('project_id', '?')}")
 
