@@ -1,0 +1,44 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# render.yaml — Render Blueprint (Infrastructure as Code)
+#
+# This file lets you deploy the backend to Render with ONE CLICK
+# or by connecting your GitHub repo in the Render dashboard.
+#
+# Docs: https://render.com/docs/blueprint-spec
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  - type: web
+    name: iot-biometric-backend
+    runtime: docker
+
+    # Build context is the repo root; Dockerfile is in backend/
+    dockerfilePath: backend/Dockerfile
+
+    # Render auto-detects the branch from your connected repo
+    branch: main
+
+    # Only rebuild when these paths change (saves build minutes)
+    autoDeploy: true
+
+    # Health check — Render calls this to verify the container is healthy
+    healthCheckPath: /health
+
+    # Free plan: service sleeps after 15 min of inactivity (cold start ~30s)
+    # Upgrade to Starter ($7/mo) to keep it always-on
+    plan: free
+
+    envVars:
+      # ── Required — set these in Render dashboard (not hardcoded here) ──────
+      - key: FIREBASE_DATABASE_URL
+        sync: false   # sync:false = Render prompts you to fill this in manually
+
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false   # Paste your service account JSON here in Render dashboard
+
+      # ── Optional overrides ─────────────────────────────────────────────────
+      - key: ALLOWED_ORIGINS
+        value: "https://aditya-sridhar-git-iot2.vercel.app"
+
+      # Render sets PORT automatically — uvicorn reads it in the Dockerfile CMD
+      # Do NOT set PORT here; Render manages it.

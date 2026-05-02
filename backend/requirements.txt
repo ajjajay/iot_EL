@@ -1,0 +1,22 @@
+# IoT Biometric Backend — Python dependencies
+# Install: pip install -r requirements.txt
+
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+
+# Firebase Admin SDK (reads/writes RTDB)
+firebase-admin>=6.5.0
+
+# ML inference (TFLite fallback — optional, threshold rules used if absent)
+# tflite-runtime is a lightweight wheel (~2 MB vs ~500 MB for full TensorFlow)
+# Render's free tier has enough memory for this.
+tflite-runtime>=2.14.0; platform_system != "Windows"
+
+# Numerics
+numpy>=1.24.0
+
+# Env var loading for local development
+python-dotenv>=1.0.0
+
+# Request validation (included with FastAPI but pinned for stability)
+pydantic>=2.0.0

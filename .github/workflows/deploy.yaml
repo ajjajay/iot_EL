@@ -1,0 +1,102 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# .github/workflows/deploy.yaml
+#
+# What this does:
+#   On every push to `main`, it:
+#   1. Runs a basic smoke test to validate the Python backend imports cleanly
+#   2. Triggers Render to rebuild and redeploy the Docker service
+#      by calling the Render Deploy Hook URL (a secret webhook stored in
+#      GitHub repository secrets, NOT in this file).
+#
+# How to set up:
+#   1. In Render → your service → Settings → Deploy Hooks → Create Hook
+#   2. Copy the generated URL (looks like https://api.render.com/deploy/srv-xxx?key=yyy)
+#   3. In GitHub → your repo → Settings → Secrets and variables → Actions → New secret
+#      Name:  RENDER_DEPLOY_HOOK_URL
+#      Value: (paste the URL from step 2)
+#   4. Push to main — this workflow runs automatically.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Deploy Backend to Render
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      # Only run when backend code actually changes — skip on firmware/docs edits
+      - 'backend/**'
+      - 'models/**'
+      - '.github/workflows/deploy.yaml'
+
+jobs:
+  validate:
+    name: Validate Python backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Syntax-check Python files
+        run: |
+          python -m py_compile backend/main.py
+          python -m py_compile backend/ml_model.py
+          python -m py_compile backend/firebase_client.py
+          python -m py_compile backend/routers/devices.py
+          python -m py_compile backend/routers/alerts.py
+          python -m py_compile backend/routers/signins.py
+          python -m py_compile backend/routers/users.py
+          echo "All Python files compile successfully"
+
+      - name: Validate ML model (threshold-rules mode — no model file needed)
+        run: |
+          python -c "
+          import sys; sys.path.insert(0, 'backend')
+          from ml_model import AmbientRiskModel
+          m = AmbientRiskModel()
+          result = m.predict(38.0, 82.0, 0.25)
+          print('Predict result:', result)
+          assert result['label'] in ['normal', 'warning', 'critical']
+          assert 0.0 <= result['risk_score'] <= 1.0
+          print('ML model validation passed')
+          "
+
+  deploy:
+    name: Trigger Render deploy
+    runs-on: ubuntu-latest
+    needs: validate     # Only deploy if validation passes
+
+    steps:
+      - name: Trigger Render Deploy Hook
+        # This calls the Render webhook URL which tells Render to pull the
+        # latest commit from main and rebuild the Docker image.
+        # RENDER_DEPLOY_HOOK_URL is stored as a GitHub Actions secret.
+        run: |
+          curl -s --fail-with-body \
+            "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" \
+            | jq .
+        # jq . pretty-prints the JSON response from Render so you can see
+        # the deploy ID in the Actions log.
+        # If RENDER_DEPLOY_HOOK_URL is not set, this step fails with a clear error.
+
+      - name: Print deploy info
+        run: |
+          echo "Deploy triggered successfully."
+          echo "Monitor progress at: https://dashboard.render.com"

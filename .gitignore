@@ -2,6 +2,10 @@
 .env
 .env.local
 *.env
+backend/.env
+
+# tflite-runtime wheels (downloaded by pip, large binary files)
+*.whl
 
 # Arduino / PlatformIO build artifacts
 firmware/.pio/

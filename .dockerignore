@@ -1,0 +1,57 @@
+# Docker build exclusions (relative to build context = repo root)
+
+# Python cache
+**/__pycache__/
+**/*.py[cod]
+**/*.pyo
+**/*.pyd
+**/.pytest_cache/
+
+# Virtual environments
+**/venv/
+**/.venv/
+**/env/
+
+# Secrets — NEVER in the image
+**/.env
+**/*.env
+**/serviceAccountKey.json
+**/firebase-adminsdk*.json
+**/google-services.json
+
+# Node / frontend (not needed in backend image)
+frontend/
+frontend/node_modules/
+
+# Firmware / Arduino artifacts
+firmware/
+*.hex
+*.elf
+*.bin
+*.map
+
+# Trained model artifacts that are gitignored (large files)
+models/saved_model/
+models/*.h5
+models/*.keras
+models/mock_dataset.csv
+
+# Git / CI
+.git/
+.github/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs
+docs/
+README.md
+CLAUDE.md
