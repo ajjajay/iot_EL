@@ -13,8 +13,8 @@ export const FIREBASE_CONFIG = {
   measurementId:     "G-MG3PHYQ22V",
 };
 
-export const DASH_EMAIL    = "dashboard@yourdomain.com";
-export const DASH_PASSWORD = "YourDashboardPassword";
+export const DASH_EMAIL    = import.meta.env.VITE_DASH_EMAIL;
+export const DASH_PASSWORD = import.meta.env.VITE_DASH_PASSWORD;
 
 const app  = initializeApp(FIREBASE_CONFIG);
 export const db   = getDatabase(app);

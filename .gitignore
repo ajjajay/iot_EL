@@ -70,3 +70,6 @@ GoogleService-Info.plist
 serviceAccountKey.json
 firebase-adminsdk*.json
 .claude/
+scripts/certs/
+frontend/.env
+scripts/.env

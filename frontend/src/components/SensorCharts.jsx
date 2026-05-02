@@ -8,12 +8,12 @@ const BASE_OPTIONS = {
   maintainAspectRatio: false,
   interaction: { mode: 'index', intersect: false },
   plugins: {
-    legend:  { display: true, labels: { color: '#8b90a7', font: { size: 11 } } },
-    tooltip: { backgroundColor: '#222636', titleColor: '#f0f2ff', bodyColor: '#8b90a7' },
+    legend:  { display: true, labels: { color: '#6b5899', font: { size: 11 } } },
+    tooltip: { backgroundColor: '#1e1033', titleColor: '#f0eeff', bodyColor: '#9b8ec4' },
   },
   scales: {
-    x: { ticks: { color: '#555b7a', maxTicksLimit: 8, font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
-    y: { ticks: { color: '#555b7a', font: { size: 10 } },                   grid: { color: 'rgba(255,255,255,0.04)' } },
+    x: { ticks: { color: '#a096c0', maxTicksLimit: 8, font: { size: 10 } }, grid: { color: 'rgba(124,58,237,0.06)' } },
+    y: { ticks: { color: '#a096c0', font: { size: 10 } },                   grid: { color: 'rgba(124,58,237,0.06)' } },
   },
 };
 
@@ -56,9 +56,10 @@ export default function SensorCharts({ readings, devices }) {
           label:           id,
           data:            pts.map(r => r[def.field] ?? null),
           borderColor:     colour,
-          backgroundColor: colour + '22',
+          backgroundColor: colour + '18',
           borderWidth:     2,
-          pointRadius:     0,
+          pointRadius:     3,
+          pointBackgroundColor: colour,
           tension:         0.4,
           fill:            true,
         });
@@ -95,7 +96,7 @@ export default function SensorCharts({ readings, devices }) {
                   {nowVal != null ? def.fmt(nowVal) : '—'}
                 </span>
               </div>
-              <div style={{ height: 120 }}>
+              <div style={{ height: 140 }}>
                 <Line data={chartDatasets[i]} options={def.options} />
               </div>
             </div>

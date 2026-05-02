@@ -9,7 +9,7 @@ import { useUsers }    from './hooks/useUsers.js';
 import { useAlerts }   from './hooks/useAlerts.js';
 import { makeDemoState, simulateDemoTick } from './utils/demo.js';
 import { useToast }    from './components/ToastContainer.jsx';
-import Navbar          from './components/Navbar.jsx';
+
 import SummaryStrip    from './components/SummaryStrip.jsx';
 import DeviceGrid      from './components/DeviceGrid.jsx';
 import SignInLog       from './components/SignInLog.jsx';
@@ -23,11 +23,11 @@ import HealthTable     from './components/HealthTable.jsx';
 export default function App() {
   const showToast = useToast();
 
-  const [theme,     setTheme]     = useState('dark');
+  const [theme,     setTheme]     = useState('light');
   const [isDemo,    setIsDemo]    = useState(false);
   const [liveDb,    setLiveDb]    = useState(null);
   const [demoState, setDemoState] = useState(null);
-  const [tick,      setTick]      = useState(0); // forces SummaryStrip clock refresh
+  const [tick,      setTick]      = useState(0);
 
   // Firebase auth on mount
   useEffect(() => {
@@ -148,43 +148,62 @@ export default function App() {
   }, [showToast]);
 
   return (
-    <>
-      <Navbar
-        theme={theme}
-        onToggleTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-        onRefresh={handleRefresh}
-        anomalyCount={anomalyCount}
-        devicesOnline={devicesOnline}
-        devicesTotal={deviceList.length}
-      />
+    <div className="app-layout">
 
-      <main className="container">
-        <SummaryStrip
-          key={tick}
-          devices={devices}
-          signins={signins}
-          users={users}
-          alerts={alerts}
-        />
+      <div className="main-area">
+        {/* Top bar */}
+        <header className="topbar">
+          <div className="topbar-left">
+            <h1 className="page-title">Dashboard</h1>
+            <span className={`status-pill ${anomalyCount > 0 ? 'status-pill-err' : 'status-pill-ok'}`}>
+              {anomalyCount > 0 ? `⚠ ${anomalyCount} Alert${anomalyCount > 1 ? 's' : ''}` : '● Live'}
+            </span>
+          </div>
+          <div className="topbar-right">
+            <button className="icon-btn" title="Toggle theme" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
+              {theme === 'dark' ? '☀' : '☾'}
+            </button>
+            <button className="icon-btn" title="Refresh" onClick={handleRefresh}>↻</button>
+            <div className="topbar-user">
+              <div className="topbar-avatar">A</div>
+              <div className="topbar-user-info">
+                <span className="topbar-user-name">Admin</span>
+                <span className="topbar-user-role">{devicesOnline}/{deviceList.length} Online</span>
+              </div>
+            </div>
+          </div>
+        </header>
 
-        <DeviceGrid devices={devices} signins={signins} />
+        {/* Main scrollable content */}
+        <main className="content">
+          <SummaryStrip
+            key={tick}
+            devices={devices}
+            signins={signins}
+            users={users}
+            alerts={alerts}
+          />
 
-        <SignInLog signins={signins} devices={devices} />
+          <DeviceGrid devices={devices} signins={signins} />
 
-        <SecurityAlerts alerts={alerts} onClear={handleClearAlerts} />
+          <SensorCharts readings={readings} devices={devices} />
 
-        <section className="section">
-          <h2 className="section-title">Enrolled Users</h2>
-          <EnrolledUsers users={users} onRemove={handleRemoveUser} />
-          <EnrollPanel   devices={devices} onSendEnroll={handleSendEnroll} />
-        </section>
+          <div className="two-col">
+            <SignInLog signins={signins} devices={devices} />
+            <SecurityAlerts alerts={alerts} onClear={handleClearAlerts} />
+          </div>
 
-        <SensorCharts readings={readings} devices={devices} />
+          <section className="section">
+            <h2 className="section-title">Enrolled Users</h2>
+            <EnrolledUsers users={users} onRemove={handleRemoveUser} />
+            <EnrollPanel   devices={devices} onSendEnroll={handleSendEnroll} />
+          </section>
 
-        <ControlsGrid devices={devices} onRelayCommand={handleRelayCommand} />
+          <ControlsGrid devices={devices} onRelayCommand={handleRelayCommand} />
 
-        <HealthTable devices={devices} />
-      </main>
-    </>
+          <HealthTable devices={devices} />
+        </main>
+      </div>
+    </div>
   );
 }

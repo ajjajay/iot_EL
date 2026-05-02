@@ -12,7 +12,7 @@ export default function Navbar({ theme, onToggleTheme, onRefresh, anomalyCount, 
   return (
     <nav className="navbar">
       <div className="nav-brand">
-        <span className="nav-icon">⬡</span>
+        <span className="nav-icon">🏠</span>
         <span className="nav-title">Iris Biometric AC</span>
         <span className="nav-version">v2.0</span>
       </div>
