@@ -1,4 +1,4 @@
-# IoT Smart Monitor
+# IoT Smart Monitor 
 
 A production-ready IoT monitoring and control system with TinyML inference on ESP32, Firebase Realtime Database, and a real-time web dashboard.
 
