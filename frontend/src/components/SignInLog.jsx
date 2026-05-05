@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatTs } from '../utils/formatters.js';
 
 const MAX_ROWS = 50;
 
@@ -42,7 +43,7 @@ export default function SignInLog({ signins, devices }) {
             {rows.length === 0 ? (
               <tr><td colSpan="6" className="table-empty">No sign-ins recorded yet</td></tr>
             ) : rows.map((ev, i) => {
-              const ts        = ev.ts ? new Date(ev.ts * 1000).toLocaleTimeString() : '—';
+              const ts        = formatTs(ev.ts);
               const anomClass = ev.anomalyScore >= 0.6 ? 'anomaly-high' : ev.anomalyScore >= 0.3 ? 'anomaly-med' : '';
               return (
                 <tr key={i}>

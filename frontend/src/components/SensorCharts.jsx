@@ -2,36 +2,39 @@ import { useState, useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
 import { deviceColour } from '../utils/colors.js';
 
-const BASE_OPTIONS = {
-  animation:  { duration: 200 },
-  responsive: true,
-  maintainAspectRatio: false,
-  interaction: { mode: 'index', intersect: false },
-  plugins: {
-    legend:  { display: true, labels: { color: '#6b5899', font: { size: 11 } } },
-    tooltip: { backgroundColor: '#1e1033', titleColor: '#f0eeff', bodyColor: '#9b8ec4' },
-  },
-  scales: {
-    x: { ticks: { color: '#a096c0', maxTicksLimit: 8, font: { size: 10 } }, grid: { color: 'rgba(124,58,237,0.06)' } },
-    y: { ticks: { color: '#a096c0', font: { size: 10 } },                   grid: { color: 'rgba(124,58,237,0.06)' } },
-  },
-};
-
-const RISK_OPTIONS = {
-  ...BASE_OPTIONS,
-  scales: { ...BASE_OPTIONS.scales, y: { ...BASE_OPTIONS.scales.y, suggestedMin: 0, suggestedMax: 1 } },
-};
+function buildChartOptions() {
+  const s = getComputedStyle(document.documentElement);
+  const g = v => s.getPropertyValue(v).trim();
+  const base = {
+    animation:  { duration: 200 },
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend:  { display: true, labels: { color: g('--text-secondary'), font: { size: 11 } } },
+      tooltip: { backgroundColor: g('--bg-base'), titleColor: g('--text-primary'), bodyColor: g('--text-secondary') },
+    },
+    scales: {
+      x: { ticks: { color: g('--text-muted'), maxTicksLimit: 8, font: { size: 10 } }, grid: { color: g('--border') } },
+      y: { ticks: { color: g('--text-muted'), font: { size: 10 } },                   grid: { color: g('--border') } },
+    },
+  };
+  const risk = { ...base, scales: { ...base.scales, y: { ...base.scales.y, suggestedMin: 0, suggestedMax: 1 } } };
+  return { base, risk };
+}
 
 const CHART_DEFS = [
-  { field: 'temperatureC', title: 'Temperature (°C)', badgeClass: 'temp-badge',  fmt: v => `${v.toFixed(1)}°C`,          options: BASE_OPTIONS },
-  { field: 'humidityPct',  title: 'Humidity (%)',     badgeClass: 'hum-badge',   fmt: v => `${v.toFixed(1)}%`,           options: BASE_OPTIONS },
-  { field: 'lightNorm',    title: 'Light Level',      badgeClass: 'light-badge', fmt: v => `${(v*100).toFixed(0)}%`,     options: BASE_OPTIONS },
-  { field: 'riskScore',    title: 'Env. Risk Score',  badgeClass: 'risk-badge',  fmt: v => `${(v*100).toFixed(0)}%`,     options: RISK_OPTIONS },
+  { field: 'temperatureC', title: 'Temperature (°C)', badgeClass: 'temp-badge',  fmt: v => `${v.toFixed(1)}°C`      },
+  { field: 'humidityPct',  title: 'Humidity (%)',     badgeClass: 'hum-badge',   fmt: v => `${v.toFixed(1)}%`       },
+  { field: 'lightNorm',    title: 'Light Level',      badgeClass: 'light-badge', fmt: v => `${(v*100).toFixed(0)}%` },
+  { field: 'riskScore',    title: 'Env. Risk Score',  badgeClass: 'risk-badge',  fmt: v => `${(v*100).toFixed(0)}%`, isRisk: true },
 ];
 
 export default function SensorCharts({ readings, devices }) {
   const [selectedDevice, setSelectedDevice] = useState('all');
   const [timeWindow,     setTimeWindow]     = useState('50');
+
+  const { base: baseOptions, risk: riskOptions } = buildChartOptions();
 
   const deviceIds    = Object.keys(devices);
   const maxPts       = parseInt(timeWindow);
@@ -96,8 +99,8 @@ export default function SensorCharts({ readings, devices }) {
                   {nowVal != null ? def.fmt(nowVal) : '—'}
                 </span>
               </div>
-              <div style={{ height: 140 }}>
-                <Line data={chartDatasets[i]} options={def.options} />
+              <div className="chart-canvas-wrap">
+                <Line data={chartDatasets[i]} options={def.isRisk ? riskOptions : baseOptions} />
               </div>
             </div>
           );

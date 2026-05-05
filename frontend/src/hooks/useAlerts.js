@@ -32,5 +32,5 @@ export function useAlerts(db) {
     };
   }, [db]);
 
-  return [alerts, setAlerts];
+  return [alerts, () => setAlerts([])];
 }

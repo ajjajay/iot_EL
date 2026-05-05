@@ -1,3 +1,5 @@
+import { formatTsMs } from '../utils/formatters.js';
+
 export default function DeviceCard({ id, device, lastSignin }) {
   const latest  = device.latest   || {};
   const meta    = device.meta     || {};
@@ -7,7 +9,7 @@ export default function DeviceCard({ id, device, lastSignin }) {
   const dotClass = `device-dot ${device.online ? (isAlert ? 'alert' : 'online') : 'offline'}`;
 
   const rs       = latest.riskScore ?? 0;
-  const riskColor = rs >= 0.6 ? 'var(--risk-crit)' : rs >= 0.3 ? 'var(--risk-warn)' : 'var(--risk-safe)';
+  const riskClass = rs >= 0.6 ? 'text-risk-crit' : rs >= 0.3 ? 'text-risk-warn' : 'text-risk-safe';
 
   return (
     <div className={`device-card${isAlert ? ' alert-active' : ''}`} data-device-id={id}>
@@ -35,7 +37,7 @@ export default function DeviceCard({ id, device, lastSignin }) {
         </div>
         <div className="bio-item">
           <div className="bio-label">Auth Result</div>
-          <div className="bio-value last-result" style={{ color: lastSignin ? (lastSignin.success ? 'var(--accent-green)' : 'var(--accent-red)') : undefined }}>
+          <div className={`bio-value last-result${lastSignin ? (lastSignin.success ? ' text-success' : ' text-danger') : ''}`}>
             {lastSignin ? (lastSignin.success ? '✓ Granted' : '✗ Denied') : '—'}
           </div>
         </div>
@@ -66,7 +68,7 @@ export default function DeviceCard({ id, device, lastSignin }) {
         <div className="sensor-item">
           <div className="sensor-icon">🧠</div>
           <div className="sensor-label">Env Risk</div>
-          <div className="sensor-value risk-value" style={{ color: riskColor }}>
+          <div className={`sensor-value risk-value ${riskClass}`}>
             {`${(rs * 100).toFixed(0)}%`}
           </div>
         </div>
@@ -74,7 +76,7 @@ export default function DeviceCard({ id, device, lastSignin }) {
 
       <div className="device-card-footer">
         <span className="last-seen">
-          Last update: {latest.ts ? new Date(latest.ts).toLocaleTimeString() : '—'}
+          Last update: {formatTsMs(latest.ts)}
         </span>
       </div>
     </div>

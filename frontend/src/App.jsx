@@ -72,7 +72,7 @@ export default function App() {
   const liveReadings = useReadings(liveDb);
   const liveSignins  = useSignins(liveDb);
   const liveUsers    = useUsers(liveDb);
-  const [liveAlerts, setLiveAlerts] = useAlerts(liveDb);
+  const [liveAlerts, clearLiveAlerts] = useAlerts(liveDb);
 
   // Resolve final data (demo overrides live when in demo mode)
   const devices = isDemo ? (demoState?.devices  ?? {}) : liveDevices;
@@ -139,8 +139,8 @@ export default function App() {
 
   const handleClearAlerts = useCallback(() => {
     if (isDemo) setDemoState(prev => ({ ...prev, alerts: [] }));
-    else        setLiveAlerts([]);
-  }, [isDemo, setLiveAlerts]);
+    else        clearLiveAlerts();
+  }, [isDemo, clearLiveAlerts]);
 
   const handleRefresh = useCallback(() => {
     setTick(n => n + 1);

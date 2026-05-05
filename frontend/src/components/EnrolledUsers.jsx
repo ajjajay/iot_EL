@@ -1,3 +1,5 @@
+import { formatDate } from '../utils/formatters.js';
+
 export default function EnrolledUsers({ users, onRemove }) {
   const userList = Object.values(users);
 
@@ -6,9 +8,7 @@ export default function EnrolledUsers({ users, onRemove }) {
       {userList.length === 0 ? (
         <div className="no-alerts">No users enrolled yet</div>
       ) : userList.map(u => {
-        const enrollDate = u.enrolledAt
-          ? new Date(u.enrolledAt * 1000).toLocaleDateString()
-          : '—';
+        const enrollDate = formatDate(u.enrolledAt);
         return (
           <div key={u.userId} className="enrolled-card">
             <div className="enrolled-avatar">

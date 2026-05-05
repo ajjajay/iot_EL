@@ -15,6 +15,11 @@ export function formatTsMs(tsMs) {
   return new Date(tsMs).toLocaleTimeString();
 }
 
+export function formatDate(tsSeconds) {
+  if (!tsSeconds) return "—";
+  return new Date(tsSeconds * 1000).toLocaleDateString();
+}
+
 export const ALERT_LABELS = {
   brute_force:       "Brute Force",
   suspicious_signin: "Suspicious Sign-in",
