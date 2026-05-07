@@ -1,0 +1,36 @@
+{
+  "deviceId":     "rpi_node_01",
+  "location":     "Entrance A",
+
+  "firebaseApiKey":  "YOUR_FIREBASE_API_KEY",
+  "firebaseUrl":     "https://YOUR-PROJECT-default-rtdb.firebaseio.com",
+  "firebaseEmail":   "rpi-node-01@yourdomain.com",
+  "firebasePass":    "DevicePassword",
+
+  "awsEnabled":   true,
+  "awsEndpoint":  "xxxxxxxxxxxxxx-ats.iot.us-east-1.amazonaws.com",
+  "awsThingName": "rpi_node_01",
+  "awsCaPath":    "data/root-ca.crt",
+  "awsCertPath":  "data/device.crt",
+  "awsKeyPath":   "data/device.key",
+
+  "dhtPin":          4,
+  "ldrSpiChannel":   0,
+  "relayPin":        17,
+  "ledPin":          27,
+  "authButtonPin":   22,
+
+  "sensorIntervalMs":    10000,
+  "heartbeatIntervalMs": 30000,
+  "buttonDebounceMs":    50,
+  "buttonLongPressMs":   2000,
+  "authDisplayMs":       3000,
+
+  "irisMatchThreshold":    0.30,
+  "irisEnrollFrames":      5,
+  "anomalyScoreThreshold": 0.60,
+  "alertCooldownMs":       30000,
+
+  "mlRiskThreshold":  0.65,
+  "tfliteModelPath":  "data/ambient_model.tflite"
+}

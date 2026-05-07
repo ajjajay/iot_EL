@@ -1,0 +1,33 @@
+# Raspberry Pi sensor node dependencies
+# Install with: pip install -r requirements.txt
+#
+# Hardware notes:
+#   DHT22    → GPIO via adafruit-circuitpython-dht + adafruit-blinka
+#   LDR      → MCP3008 SPI ADC (RPi has no onboard ADC) via adafruit-circuitpython-mcp3xxx
+#   Relay    → RPi.GPIO
+#   LED      → RPi.GPIO
+#   Camera   → picamera2 (RPi Camera Module) or opencv-python-headless (USB webcam)
+
+# Core
+numpy>=1.23.0
+requests>=2.31.0
+
+# GPIO
+RPi.GPIO>=0.7.1
+
+# DHT22 sensor
+adafruit-blinka>=8.0.0
+adafruit-circuitpython-dht>=3.7.0
+
+# LDR via MCP3008 SPI ADC
+adafruit-circuitpython-mcp3xxx>=1.4.0
+
+# Camera (choose one or both — IrisCamera tries picamera2 first, then OpenCV)
+picamera2>=0.3.12
+opencv-python-headless>=4.8.0
+
+# TFLite runtime (lighter than full TensorFlow)
+tflite-runtime>=2.14.0
+
+# AWS IoT Core MQTT
+paho-mqtt>=1.6.1

@@ -2,61 +2,62 @@
 
 ## Firebase Realtime Database Paths
 
+All paths are identical regardless of whether the device is an ESP32 or Raspberry Pi.
+
 ### Device State
 
 | Path | Type | Description |
 |---|---|---|
 | `/devices/{id}/meta/deviceId` | string | Device identifier |
 | `/devices/{id}/meta/location` | string | Physical location label |
-| `/devices/{id}/meta/firmware` | string | Firmware version string |
+| `/devices/{id}/meta/firmware` | string | Firmware/software version |
 | `/devices/{id}/meta/registeredAt` | number | Unix timestamp (seconds) of first boot |
 | `/devices/{id}/online` | boolean | Current connectivity status |
 
-### Latest Ambient Reading (updated every `sensorIntervalMs`)
+### Latest Ambient Reading
+
+Updated every `sensorIntervalMs` milliseconds.
 
 | Path | Type | Range | Description |
 |---|---|---|---|
-| `/devices/{id}/latest/temperatureC` | float | -40 – 80 | Temperature in °C |
+| `/devices/{id}/latest/temperatureC` | float | -40 – 80 | Temperature °C |
 | `/devices/{id}/latest/humidityPct` | float | 0 – 100 | Relative humidity % |
 | `/devices/{id}/latest/lightRaw` | int | 0 – 4095 | Raw 12-bit ADC value |
 | `/devices/{id}/latest/lightNorm` | float | 0.0 – 1.0 | Normalised light level |
 | `/devices/{id}/latest/riskScore` | float | 0.0 – 1.0 | ML composite env risk score |
-| `/devices/{id}/latest/mlLabel` | int | 0/1/2 | 0=normal, 1=warning, 2=critical |
-| `/devices/{id}/latest/pNormal` | float | 0.0 – 1.0 | Softmax probability — normal |
-| `/devices/{id}/latest/pWarning` | float | 0.0 – 1.0 | Softmax probability — warning |
-| `/devices/{id}/latest/pCritical` | float | 0.0 – 1.0 | Softmax probability — critical |
-| `/devices/{id}/latest/state` | string | FSM state | Current FSM state name |
-| `/devices/{id}/latest/ts` | number | ms | JavaScript-style timestamp (millis since epoch) |
+| `/devices/{id}/latest/mlLabel` | int | 0 / 1 / 2 | 0=normal, 1=warning, 2=critical |
+| `/devices/{id}/latest/state` | string | — | Current FSM state name |
+| `/devices/{id}/latest/ts` | number | ms | JS-style timestamp (ms since epoch) |
 
-### Heartbeat (updated every `heartbeatIntervalMs`)
+### Heartbeat
+
+Updated every `heartbeatIntervalMs` milliseconds.
 
 | Path | Type | Description |
 |---|---|---|
 | `/devices/{id}/heartbeat/ts` | number | Unix seconds |
 | `/devices/{id}/heartbeat/state` | string | FSM state at heartbeat time |
-| `/devices/{id}/heartbeat/heapFree` | number | Free heap bytes |
-| `/devices/{id}/heartbeat/uptime` | number | Seconds since boot |
+| `/devices/{id}/heartbeat/uptime` | number | Seconds since process start |
 
 ### Commands (written by dashboard, polled by device)
 
 | Path | Type | Values | Description |
 |---|---|---|---|
-| `/devices/{id}/commands/relayOverride` | string | `"ON"` / `"OFF"` / `"AUTO"` | Manual relay control |
+| `/devices/{id}/commands/relayOverride` | string | `"ON"` / `"OFF"` / `"AUTO"` | Manual relay control (expires 5 min) |
 | `/devices/{id}/commands/enroll/userId` | string | any | User ID to enroll |
 | `/devices/{id}/commands/enroll/name` | string | any | Full name |
-| `/devices/{id}/commands/enroll/pending` | boolean | `true` | Set true to trigger enrollment; device clears it after reading |
+| `/devices/{id}/commands/enroll/pending` | boolean | `true` | Set true to trigger; device clears after reading |
 
-### Remote Config (written by admin, read by device at boot)
+### Remote Config (optional threshold overrides)
 
 | Path | Type | Description |
 |---|---|---|
-| `/devices/{id}/config/tempWarningC` | float | Override warning threshold |
+| `/devices/{id}/config/irisMatchThreshold` | float | Override iris RMS distance threshold |
+| `/devices/{id}/config/anomalyScoreThreshold` | float | Override anomaly alert threshold |
+| `/devices/{id}/config/mlRiskThreshold` | float | Override ML env risk threshold |
+| `/devices/{id}/config/tempWarningC` | float | Override temperature warning threshold |
 | `/devices/{id}/config/tempCriticalC` | float | Override critical threshold |
 | `/devices/{id}/config/humidityWarningPct` | float | Override humidity threshold |
-| `/devices/{id}/config/mlRiskThreshold` | float | Override ML risk threshold |
-| `/devices/{id}/config/sensorIntervalMs` | int | Override polling interval |
-| `/devices/{id}/config/irisMatchThreshold` | float | Override iris match distance threshold |
-| `/devices/{id}/config/anomalyScoreThreshold` | float | Override anomaly alert threshold |
 
 ### Time-series Ambient Readings
 
@@ -64,20 +65,19 @@
 |---|---|---|
 | `/readings/{id}/{pushId}` | object | Full reading snapshot (same fields as `/latest`) |
 
-### Sign-in Log (biometric authentication events)
+### Sign-in Log
 
 | Path | Type | Description |
 |---|---|---|
-| `/signins/{id}/{pushId}/userId` | string | Matched (or attempted) user ID |
-| `/signins/{id}/{pushId}/userName` | string | User's full name |
+| `/signins/{id}/{pushId}/userId` | string | Matched user ID (or `"unknown"`) |
+| `/signins/{id}/{pushId}/userName` | string | User display name |
 | `/signins/{id}/{pushId}/deviceId` | string | Source device |
-| `/signins/{id}/{pushId}/matchScore` | float | Iris match distance (lower = better) |
+| `/signins/{id}/{pushId}/matchScore` | float | Iris RMS distance (lower = better) |
 | `/signins/{id}/{pushId}/success` | boolean | Authentication result |
 | `/signins/{id}/{pushId}/anomalyScore` | float | Composite anomaly score at event time |
 | `/signins/{id}/{pushId}/ts` | number | JS timestamp (ms) |
 
-> Sign-in records are write-once per device (enforced by prod.rules).
-> Use `.limitToLast(50)` to fetch the 50 most recent events.
+Use `.limitToLast(50)` to fetch the most recent 50 events efficiently.
 
 ### Enrolled Users
 
@@ -94,131 +94,94 @@
 | Path | Type | Description |
 |---|---|---|
 | `/alerts/{id}/{pushId}/deviceId` | string | Source device |
-| `/alerts/{id}/{pushId}/alertType` | string | `"env_threshold"` / `"brute_force"` / `"suspicious_score"` |
-| `/alerts/{id}/{pushId}/userId` | string | Affected user (biometric alerts only) |
-| `/alerts/{id}/{pushId}/anomalyScore` | float | Anomaly score at trigger (biometric alerts) |
-| `/alerts/{id}/{pushId}/riskScore` | float | Risk score at trigger (env alerts) |
+| `/alerts/{id}/{pushId}/alertType` | string | `"brute_force"` / `"suspicious_signin"` / `"env_threshold"` |
+| `/alerts/{id}/{pushId}/userId` | string | Affected user |
+| `/alerts/{id}/{pushId}/anomalyScore` | float | Score at trigger time |
 | `/alerts/{id}/{pushId}/ts` | number | JS timestamp (ms) |
 | `/alerts/{id}/{pushId}/acknowledged` | boolean | Set true by dashboard |
 
 ---
 
-## C++ Module API
+## Module API — ESP32 (C++)
 
 ### StateManager
 
 ```cpp
 StateManager fsm;
-fsm.current()               // → DeviceState enum
-fsm.transition(next)        // → bool (false if illegal transition)
-fsm.timeInState()           // → unsigned long ms in current state
-fsm.transitionCount()       // → uint32_t total transitions
-
-stateToString(state)        // → const char* e.g. "MONITORING", "AUTHENTICATING"
+fsm.current()                   // → DeviceState enum
+fsm.transition(newState)        // → bool (false if illegal)
+fsm.timeInState()               // → unsigned long ms
 ```
 
-**DeviceState values**: `INIT`, `CONNECTING`, `READY`, `MONITORING`, `ALERT`, `ERROR`, `ENROLLING`, `AUTHENTICATING`, `AUTHENTICATED`, `REJECTED`
+**DeviceState**: `INIT`, `CONNECTING`, `READY`, `MONITORING`, `ALERT`, `ERROR`, `ENROLLING`, `AUTHENTICATING`, `AUTHENTICATED`, `REJECTED`
 
 ### IrisCamera
 
 ```cpp
-IrisCamera cam;             // uses AI Thinker default pins
-cam.begin()                 // → bool; initialises OV2640 + tunes sensor
+IrisCamera cam;                 // AI Thinker default pins
+cam.begin()                     // → bool; inits OV2640
 IrisCapture c = cam.capture();
-// c.features[64]  float32 descriptor
-// c.valid         bool
-// c.timestampMs   millis since boot
-
+// c.features[64], c.valid, c.timestampMs
 IrisCapture c = cam.captureAverage(numFrames=5, delayMs=200);
-// averages N valid frames; returns invalid if < 2 valid frames captured
-cam.isReady()               // → bool
 ```
 
 ### BiometricManager
 
 ```cpp
 BiometricManager bio;
-bio.begin()                        // → bool; mounts SPIFFS, loads templates
-bio.enroll(userId, name, iris)     // → bool; saves template to SPIFFS
-MatchResult r = bio.match(iris);
-// r.matched, r.userId[32], r.userName[64], r.score, r.templateIdx
-bio.removeUser(userId)             // → bool; deletes all templates + registry entry
-bio.saveRegistry()                 // → bool; writes /bio/users.json to SPIFFS
-bio.userCount()                    // → uint8_t
+bio.begin()                         // mounts SPIFFS, loads templates
+bio.enroll(userId, name, iris)      // → bool; saves to /bio/{userId}_t{N}.bin
+MatchResult r = bio.match(iris, threshold);
+// r.matched, r.userId, r.userName, r.score, r.templateIdx
+bio.removeUser(userId)              // → bool
+bio.userCount()                     // → uint8_t
 ```
-
-**Constants**: `BIO_MAX_USERS=16`, `BIO_MAX_TEMPLATES=5`, `BIO_MATCH_THRESH=0.30f`
 
 ### AnomalyDetector
 
 ```cpp
-AnomalyDetector anomaly(matchThreshold=BIO_MATCH_THRESH);
+AnomalyDetector anomaly(matchThreshold);
 float score = anomaly.record(matchResult, success);
-// score = 0.40×failureRate + 0.35×scoreProximity + 0.25×frequencySpike
-// returns composite anomaly score in [0.0, 1.0]
-
-anomaly.bruteForceScore()          // → float (failure-rate component only)
-anomaly.consecutiveFailures()      // → uint8_t
+// 0.40×failureRate + 0.35×scoreProximity + 0.25×frequencySpike → [0.0, 1.0]
+anomaly.bruteForceScore()           // → float (failure rate only)
+anomaly.consecutiveFailures()       // → uint8_t
 ```
-
-**Window**: last 20 events; brute-force threshold: 3+ consecutive failures.
 
 ### AlertManager
 
 ```cpp
 AlertManager alerts(thingName, awsIoTPtr, firebasePtr);
-// awsIoTPtr may be nullptr (Firebase-only mode)
-
-alerts.sendAnomaly(userId, anomalyScore, alertType, detail="")
-// → bool; suppressed if same alertType sent within ALERT_COOLDOWN_MS (30s)
-// sends to AWS MQTT topic iot/{thing}/biometric/alert
-// appends to Firebase /alerts/{deviceId}/
-
+alerts.sendAnomaly(userId, score, alertType, detail="")
+// → bool; suppressed within ALERT_COOLDOWN_MS (30 s) for same alertType
 alerts.onAgentAck(userId, alertType)
-// call when AWSIoTManager.getAgentAck() returns true
 ```
 
 ### FirebaseManager
 
 ```cpp
 FirebaseManager fb(apiKey, dbUrl, email, password, deviceId);
-fb.begin()                              // → bool; authenticates + registers
-fb.pushReading(reading, ml, state)     // push or enqueue if offline
-fb.pollCommands(outRelay)              // → bool if relay command changed
+fb.begin()                                          // → bool
+fb.pushReading(reading, ml, state)                 // enqueues if offline
+fb.pollCommands(outRelay)                          // → bool if changed
 fb.sendHeartbeat(state)
-fb.flushQueue()                        // drain offline ring buffer
-fb.setOnline(bool)
-fb.isConnected()                       // → bool
-
-// Biometric methods
-fb.pushSignIn(userId, userName, matchScore, success, anomalyScore)
+fb.flushQueue()
+fb.pushSignIn(userId, userName, score, success, anomalyScore)
 fb.pushEnrollment(userId, name)
 fb.pushBiometricAlert(userId, alertType, anomalyScore)
-fb.pollEnrollCommand(outUserId, 32, outName, 64)  // → bool if pending command
+fb.pollEnrollCommand(outUserId, 32, outName, 64)   // → bool if pending
 ```
 
 ### AWSIoTManager
 
 ```cpp
-AWSIoTManager awsIoT(endpoint, thingName, pubSubClient);
-awsIoT.begin()                                // → bool; connects + subscribes
-awsIoT.loop()                                 // call in loop() — services MQTT
-awsIoT.isConnected()                          // → bool
-
-awsIoT.publishBiometricEvent(userId, score, success)
-// publishes to: iot/{thingName}/biometric/signin
-
-awsIoT.publishAlertJson(jsonString)           // → bool
-// publishes to: iot/{thingName}/biometric/alert
-
-awsIoT.getAgentAck(outUserId, outAlertType)   // → bool; clears pending flag
-// true if Bedrock Agent ACK received on iot/{thingName}/ai/alerts
+AWSIoTManager aws(endpoint, thingName, rootCA, cert, key);
+aws.begin()                                        // → bool
+aws.loop()                                         // call in loop()
+aws.publishBiometricEvent(userId, score, success)
+aws.publishAlertJson(jsonString)                   // → bool
+aws.getAgentAck(outUserId, outAlertType)           // → bool (clears flag)
+aws.getRelayCommand(outRelay)                      // → bool
 ```
-
-**Subscribed MQTT topics**:
-- `iot/{thingName}/commands`
-- `$aws/things/{thingName}/shadow/update/delta`
-- `iot/{thingName}/ai/alerts`
 
 ### SensorManager
 
@@ -226,8 +189,7 @@ awsIoT.getAgentAck(outUserId, outAlertType)   // → bool; clears pending flag
 SensorManager sensors(dhtPin, dhtType, ldrPin, emaAlpha=0.3f);
 sensors.begin();
 SensorReading r = sensors.readNow();
-// r.temperatureC, r.humidityPct, r.lightRaw, r.lightNorm, r.valid, r.timestampMs
-sensors.failCount()         // consecutive failures since last success
+// r.temperatureC, r.humidityPct, r.lightRaw, r.lightNorm, r.valid
 ```
 
 ### ActuatorController
@@ -235,43 +197,138 @@ sensors.failCount()         // consecutive failures since last success
 ```cpp
 ActuatorController act(relayPin, ledPin, activeLow=true);
 act.begin();
-act.setRelay(RelayState::ON / ::OFF);
-act.setRelayOverride(state, timeoutMs);  // dashboard override
-act.clearRelayOverride();
-act.hasRelayOverride()      // bool
-act.setLedPattern(LedPattern::BLINK_SLOW / ::BLINK_FAST / ::BLINK_SOS / ...);
-act.tick();                 // call in loop() — services blink patterns
+act.setRelay(RelayState::ON / OFF);
+act.setRelayOverride(state, timeoutMs);   // expires after timeoutMs
+act.setLedPattern(LedPattern::BLINK_SLOW / BLINK_FAST / BLINK_SOS / ON / OFF);
+act.tick();                               // call in loop()
 ```
 
 ### MLInference
 
 ```cpp
 MLInference ml;
-ml.begin()               // → bool; loads model from tinyml_model.h
+ml.begin()                     // loads from tinyml_model.h
 MLResult r = ml.infer(tempC, humPct, lightNorm);
 // r.pNormal, r.pWarning, r.pCritical, r.riskScore, r.label, r.valid
 ```
 
-### ConfigManager
+---
 
-```cpp
-ConfigManager config;
-config.load()             // loads /config.json from SPIFFS
-config.save()             // writes current config back to SPIFFS
-const DeviceConfig& c = config.cfg();
-config.setThresholds(tempWarn, tempCrit, humWarn, lightLow);
+## Module API — Raspberry Pi (Python)
+
+All modules mirror the C++ API with Python naming conventions.
+
+### StateManager
+
+```python
+from state_manager import StateManager, DeviceState
+fsm = StateManager()
+fsm.current()                   # → DeviceState enum
+fsm.transition(DeviceState.X)   # → bool (False if illegal)
+fsm.time_in_state_ms()          # → float ms
 ```
 
-**Key `DeviceConfig` fields (biometric)**:
+### IrisCamera
 
-| Field | Default | Description |
-|---|---|---|
-| `authButtonPin` | 15 | GPIO for auth button |
-| `irisMatchThreshold` | 0.30 | RMS distance threshold |
-| `irisEnrollFrames` | 5 | Frames averaged per enrollment |
-| `authDisplayMs` | 3000 | ms relay stays open after auth |
-| `anomalyScoreThreshold` | 0.60 | Threshold to trigger alert |
-| `alertCooldownMs` | 30000 | ms between duplicate alerts |
+```python
+from iris_camera import IrisCamera, IrisCapture
+cam = IrisCamera()
+cam.begin()                     # → bool; tries picamera2, falls back to OpenCV
+c = cam.capture()               # → IrisCapture(features: np.ndarray[64], valid, timestamp_ms)
+c = cam.capture_average(num_frames=5, delay_ms=200)
+cam.close()
+```
+
+### BiometricManager
+
+```python
+from biometric_manager import BiometricManager, MatchResult
+bio = BiometricManager()
+bio.begin()                             # creates bio/ dir, loads registry
+bio.enroll(user_id, name, iris)         # → bool; saves bio/{userId}_t{N}.npy
+result = bio.match(iris, threshold)     # → MatchResult(matched, user_id, user_name, score)
+bio.remove_user(user_id)               # → bool
+bio.user_count()                        # → int
+```
+
+### AnomalyDetector
+
+```python
+from anomaly_detector import AnomalyDetector
+anomaly = AnomalyDetector(match_threshold=0.30)
+score = anomaly.record(result, success)   # → float [0.0, 1.0]
+anomaly.brute_force_score()              # → float
+anomaly.consecutive_failures()           # → int
+```
+
+### AlertManager
+
+```python
+from alert_manager import AlertManager
+alerts = AlertManager(thing_name, aws_iot, firebase)
+alerts.send_anomaly(user_id, score, alert_type, detail="")  # → bool
+alerts.on_agent_ack(user_id, alert_type)
+```
+
+### FirebaseManager
+
+```python
+from firebase_manager import FirebaseManager
+fb = FirebaseManager(api_key, db_url, email, password, device_id)
+fb.begin()                                          # → bool; authenticates
+fb.push_reading(sensor, ml, state)
+fb.poll_commands()                                  # → RelayState or None
+fb.send_heartbeat(state)
+fb.flush_queue()
+fb.push_sign_in(user_id, user_name, score, success, anomaly_score)
+fb.push_enrollment(user_id, name)
+fb.push_biometric_alert(user_id, alert_type, anomaly_score)
+fb.poll_enroll_command()                            # → (user_id, name) or None
+```
+
+### AWSIoTManager
+
+```python
+from aws_iot_manager import AWSIoTManager
+aws = AWSIoTManager(endpoint, thing_name, ca_path, cert_path, key_path)
+aws.begin()                                        # → bool; connects paho-mqtt
+aws.loop()                                         # no-op (paho uses loop_start)
+aws.publish_biometric_event(user_id, score, success)
+aws.publish_alert_json(json_str)                   # → bool
+aws.get_agent_ack()                                # → (user_id, alert_type) or None
+aws.get_relay_command()                            # → RelayState or None
+```
+
+### SensorManager
+
+```python
+from sensor_manager import SensorManager, SensorReading
+sensors = SensorManager(dht_pin=4, ldr_spi_channel=0)
+sensors.begin()
+r = sensors.read_now()    # → SensorReading(temperature_c, humidity_pct, light_raw, light_norm, valid)
+```
+
+### ActuatorController
+
+```python
+from actuator_controller import ActuatorController, RelayState, LedPattern
+act = ActuatorController(relay_pin=17, led_pin=27)
+act.begin()
+act.set_relay(RelayState.ON)
+act.set_relay_override(RelayState.ON, timeout_ms=300_000)
+act.set_led_pattern(LedPattern.BLINK_SLOW)
+act.tick()     # call in main loop every ~10 ms
+act.cleanup()  # call on shutdown
+```
+
+### MLInference
+
+```python
+from ml_inference import MLInference, MLResult
+ml = MLInference(model_path="data/ambient_model.tflite")
+ml.begin()                                 # → bool; loads .tflite file
+r = ml.infer(temp_c, hum_pct, light_norm) # → MLResult(p_normal, p_warning, p_critical, risk_score, label, valid)
+```
 
 ---
 
@@ -282,54 +339,71 @@ config.setThresholds(tempWarn, tempCrit, humWarn, lightLow);
 | `iot/{thing}/biometric/signin` | Device → Cloud | Authentication event telemetry |
 | `iot/{thing}/biometric/alert` | Device → Cloud | Anomaly alert payload |
 | `iot/{thing}/ai/alerts` | Cloud → Device | Bedrock Agent ACK |
-| `iot/{thing}/commands` | Cloud → Device | Remote commands |
-| `$aws/things/{thing}/shadow/update/delta` | Cloud → Device | Shadow config updates |
+| `iot/{thing}/telemetry` | Device → Cloud | Ambient sensor reading |
+| `iot/{thing}/heartbeat` | Device → Cloud | Alive ping |
+| `iot/{thing}/commands` | Cloud → Device | Remote relay command |
+| `$aws/things/{thing}/shadow/update` | Device → Cloud | Device Shadow report |
+| `$aws/things/{thing}/shadow/update/delta` | Cloud → Device | Shadow desired changes |
 
 **Sign-in event payload** (`iot/{thing}/biometric/signin`):
 ```json
 {
-  "deviceId": "esp32_node_01",
-  "userId": "john_doe",
+  "deviceId":  "rpi_node_01",
+  "userId":    "john_doe",
   "matchScore": 0.143,
-  "success": true,
-  "ts": 1713960305000
+  "success":   true,
+  "ts":        1713960305000
 }
 ```
 
 **Alert payload** (`iot/{thing}/biometric/alert`):
 ```json
 {
-  "thingName": "esp32_node_01",
-  "userId": "unknown",
-  "alertType": "brute_force",
-  "detail": "3 consecutive failures",
+  "deviceId":    "rpi_node_01",
+  "userId":      "unknown",
+  "alertType":   "brute_force",
   "anomalyScore": 0.82,
-  "ts": 1713960400000
+  "detail":      "Repeated failed iris attempts",
+  "ts":          1713960400000
+}
+```
+
+**Bedrock Agent ACK** (`iot/{thing}/ai/alerts`):
+```json
+{
+  "userId":    "unknown",
+  "alertType": "brute_force",
+  "ack":       true
 }
 ```
 
 ---
 
-## Ambient ML Model API
+## Ambient ML Model
 
-### Input tensor
-
-Shape: `[1, 3]` float32
+### Input tensor — shape `[1, 3]` float32
 
 | Index | Feature | Normalisation |
 |---|---|---|
-| 0 | temperature_c | `(t - (-10)) / (60 - (-10))` → [0, 1] |
+| 0 | temperature_c | `(t − (−10)) / (60 − (−10))` → [0, 1] |
 | 1 | humidity_pct | `h / 100.0` → [0, 1] |
 | 2 | light_norm | already [0, 1] from ADC |
 
-### Output tensor
-
-Shape: `[1, 3]` float32 (softmax)
+### Output tensor — shape `[1, 3]` float32 (softmax)
 
 | Index | Class | Meaning |
 |---|---|---|
 | 0 | normal | System within safe parameters |
-| 1 | warning | Elevated risk; monitor closely |
+| 1 | warning | Elevated risk |
 | 2 | critical | Immediate action required |
 
-**Env risk score** = `output[1] × 0.5 + output[2] × 1.0` ∈ [0, 1]
+**Risk score** = `output[1] × 0.5 + output[2] × 1.0` ∈ [0, 1]
+
+### Model file locations
+
+| Platform | Format | Path |
+|---|---|---|
+| ESP32 | C byte array (`tinyml_model.h`) | `firmware/esp32_sensor_node/tinyml_model.h` |
+| Raspberry Pi | `.tflite` binary | `firmware/rpi_sensor_node/data/ambient_model.tflite` |
+
+Both are produced from the same Keras model. The converter step (`model_converter.py`) is only needed for ESP32.
