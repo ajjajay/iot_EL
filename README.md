@@ -1,4 +1,5 @@
-# IoT Smart Monitor 
+# IoT Smart Monitor Rpi and ESP32
+
 
 A production-ready IoT monitoring and control system with TinyML inference on ESP32, Firebase Realtime Database, and a real-time web dashboard.
 
