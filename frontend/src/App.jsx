@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { ref, set, remove } from 'firebase/database';
+import { ref, set, push, remove } from 'firebase/database';
 import { db, auth, DASH_EMAIL, DASH_PASSWORD } from './firebase.js';
 import { useDevices }  from './hooks/useDevices.js';
 import { useReadings } from './hooks/useReadings.js';
@@ -16,8 +16,8 @@ import SignInLog       from './components/SignInLog.jsx';
 import SecurityAlerts  from './components/SecurityAlerts.jsx';
 import EnrolledUsers   from './components/EnrolledUsers.jsx';
 import EnrollPanel     from './components/EnrollPanel.jsx';
+import WebcamAuth      from './components/WebcamAuth.jsx';
 import SensorCharts    from './components/SensorCharts.jsx';
-import ControlsGrid    from './components/ControlsGrid.jsx';
 import HealthTable     from './components/HealthTable.jsx';
 
 export default function App() {
@@ -137,6 +137,54 @@ export default function App() {
       .catch(e  => showToast(`Command failed: ${e.message}`, 'alert'));
   }, [isDemo, showToast]);
 
+  // Webcam authentication: log sign-in + unlock relay on match
+  const handleWebcamAuth = useCallback(async (deviceId, result) => {
+    if (isDemo) {
+      showToast(
+        result.matched ? `[Demo] Access granted: ${result.userName}` : '[Demo] Access denied',
+        result.matched ? 'ok' : 'alert'
+      );
+      return;
+    }
+    await push(ref(db, `/signins/${deviceId}`), {
+      userId:      result.userId   ?? 'unknown',
+      userName:    result.userName ?? 'Unknown',
+      deviceId,
+      matchScore:  result.score,
+      success:     result.matched,
+      anomalyScore: 0,
+      ts:          Date.now(),
+    });
+    if (result.matched) {
+      await set(ref(db, `/devices/${deviceId}/commands/relayOverride`), 'ON');
+      showToast(`Access granted — ${result.userName}`, 'ok');
+    } else {
+      showToast('Access denied', 'alert');
+    }
+  }, [isDemo, showToast]);
+
+  // Webcam enrollment: store template + user record directly in Firebase
+  const handleWebcamEnroll = useCallback(async (deviceId, userId, name, template) => {
+    if (isDemo) {
+      setDemoState(prev => ({
+        ...prev,
+        users: {
+          ...prev.users,
+          [userId]: { userId, name, deviceId, enrolledAt: Date.now(), active: true, template },
+        },
+      }));
+      showToast(`[Demo] ${name} enrolled via webcam`, 'ok');
+      return;
+    }
+    await set(ref(db, `/users/${userId}`), {
+      userId, name, deviceId,
+      enrolledAt: Date.now(),
+      active: true,
+      template,
+    });
+    showToast(`${name} enrolled via webcam`, 'ok');
+  }, [isDemo, showToast]);
+
   const handleClearAlerts = useCallback(() => {
     if (isDemo) setDemoState(prev => ({ ...prev, alerts: [] }));
     else        clearLiveAlerts();
@@ -194,12 +242,23 @@ export default function App() {
           </div>
 
           <section className="section">
-            <h2 className="section-title">Enrolled Users</h2>
-            <EnrolledUsers users={users} onRemove={handleRemoveUser} />
-            <EnrollPanel   devices={devices} onSendEnroll={handleSendEnroll} />
+            <h2 className="section-title">Biometric Authentication</h2>
+            <WebcamAuth
+              devices={devices}
+              users={users}
+              onResult={handleWebcamAuth}
+            />
           </section>
 
-          <ControlsGrid devices={devices} onRelayCommand={handleRelayCommand} />
+          <section className="section">
+            <h2 className="section-title">Enrolled Users</h2>
+            <EnrolledUsers users={users} onRemove={handleRemoveUser} />
+            <EnrollPanel
+              devices={devices}
+              onSendEnroll={handleSendEnroll}
+              onWebcamEnroll={handleWebcamEnroll}
+            />
+          </section>
 
           <HealthTable devices={devices} />
         </main>

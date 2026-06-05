@@ -138,8 +138,8 @@ body{font-family:var(--font-sans);background:var(--bg-base);color:var(--text-pri
 .chart-badge{font-size:14px;font-weight:800;font-family:var(--font-mono);padding:2px 10px;border-radius:20px}
 .temp-badge{background:rgba(249,115,22,0.1);color:var(--accent-orange)}
 .hum-badge{background:rgba(34,211,238,0.1);color:var(--accent-cyan)}
-.light-badge{background:rgba(234,179,8,0.1);color:var(--accent-yellow)}
-.risk-badge{background:rgba(239,68,68,0.1);color:var(--accent-red)}
+.smoke-badge{background:rgba(239,68,68,0.1);color:var(--accent-red)}
+.dist-badge{background:rgba(124,58,237,0.1);color:var(--accent-purple)}
 
 /* ── Two-col layout ── */
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px}
@@ -231,6 +231,29 @@ body{font-family:var(--font-sans);background:var(--bg-base);color:var(--text-pri
 .risk-bar-track{height:8px;background:var(--bg-elevated);border-radius:4px;overflow:hidden}
 .risk-bar-fill{height:100%;border-radius:4px;transition:width 0.5s ease,background 0.5s ease;width:0%;background:var(--risk-safe)}
 .risk-bar-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted)}
+
+/* ── Webcam Auth / Enroll ── */
+.webcam-auth-panel{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+.webcam-auth-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.webcam-idle{display:flex;flex-direction:column;gap:10px}
+.webcam-live{display:flex;flex-direction:column;gap:12px}
+.webcam-video-wrap{position:relative;border-radius:var(--radius-sm);overflow:hidden;background:#000;max-width:360px}
+.webcam-video{display:block;width:100%;border-radius:var(--radius-sm)}
+.webcam-overlay{position:absolute;bottom:0;left:0;right:0;padding:10px 14px;font-size:15px;font-weight:700;color:#fff;text-align:center}
+.overlay-ok{background:rgba(34,197,94,0.82)}
+.overlay-fail{background:rgba(239,68,68,0.82)}
+.overlay-capture{background:rgba(124,58,237,0.82)}
+.webcam-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.auth-result-badge{padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:600}
+.result-ok{background:rgba(34,197,94,0.12);color:var(--accent-green);border:1px solid rgba(34,197,94,0.25)}
+.result-fail{background:rgba(239,68,68,0.10);color:var(--accent-red);border:1px solid rgba(239,68,68,0.25)}
+.webcam-err{font-size:13px;color:var(--accent-red)}
+.webcam-warn{font-size:12px;color:var(--accent-yellow);background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.2);border-radius:var(--radius-sm);padding:8px 12px}
+.enroll-tabs{display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;width:fit-content}
+.enroll-tab{padding:7px 18px;font-size:13px;font-weight:600;background:transparent;color:var(--text-secondary);border:none;cursor:pointer;transition:all var(--transition)}
+.enroll-tab.active{background:var(--accent);color:#fff}
+.enroll-tab:hover:not(.active){background:var(--bg-hover);color:var(--text-primary)}
+.webcam-enroll-body{display:flex;flex-direction:column;gap:12px}
 
 /* ── Responsive ── */
 @media(max-width:1024px){.two-col{grid-template-columns:1fr}}

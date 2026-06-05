@@ -7,13 +7,13 @@ export function makeDemoState() {
       meta:      { deviceId: "esp32_node_01", location: "Entrance A",  firmware: "2.0.0" },
       online:    true,
       heartbeat: { state: "MONITORING", heapFree: 215000, uptime: 300 },
-      latest:    { temperatureC: 22, humidityPct: 55, lightRaw: 2048, lightNorm: 0.5, riskScore: 0.08, mlLabel: 0, state: "MONITORING", ts: now },
+      latest:    { temperatureC: 22, humidityPct: 55, smokeRaw: 300, smokePct: 7.3, distanceCm: 45.2, riskScore: 0.08, mlLabel: 0, state: "MONITORING", ts: now },
     },
     esp32_node_02: {
       meta:      { deviceId: "esp32_node_02", location: "Server Room", firmware: "2.0.0" },
       online:    true,
       heartbeat: { state: "ALERT",      heapFree: 215000, uptime: 300 },
-      latest:    { temperatureC: 27, humidityPct: 65, lightRaw: 2048, lightNorm: 0.5, riskScore: 0.72, mlLabel: 2, state: "ALERT", ts: now },
+      latest:    { temperatureC: 27, humidityPct: 65, smokeRaw: 2500, smokePct: 61.0, distanceCm: 12.5, riskScore: 0.72, mlLabel: 2, state: "ALERT", ts: now },
     },
   };
 
@@ -56,7 +56,9 @@ export function simulateDemoTick(prev) {
     const r = {
       temperatureC: 22 + i * 5 + (Math.random() - 0.5) * 4,
       humidityPct:  55 + i * 10 + (Math.random() - 0.5) * 8,
-      lightNorm:    0.4 + Math.random() * 0.4,
+      smokePct:     i === 1 ? 45 + Math.random() * 30 : Math.random() * 15,
+      smokeRaw:     Math.round(Math.random() * 4095),
+      distanceCm:   5 + Math.random() * 200,
       riskScore:    i === 1 ? 0.6 + Math.random() * 0.3 : Math.random() * 0.25,
       ts:           now,
     };
