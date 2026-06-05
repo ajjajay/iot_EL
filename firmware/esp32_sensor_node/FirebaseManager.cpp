@@ -1,5 +1,6 @@
 #include "FirebaseManager.h"
 #include <Arduino.h>
+#include <time.h>
 
 FirebaseManager::FirebaseManager(const char* apiKey, const char* databaseUrl,
                                   const char* userEmail, const char* userPassword,
@@ -41,8 +42,8 @@ bool FirebaseManager::begin() {
     String path = _devicePath() + "/meta";
     FirebaseJson meta;
     meta.set("deviceId",  _deviceId);
-    meta.set("firmware",  "1.0.0");
-    meta.set("registeredAt", (uint32_t)(millis() / 1000));
+    meta.set("firmware",  "2.0.0");
+    meta.set("registeredAt", (uint32_t)time(nullptr));
 
     if (!Firebase.RTDB.updateNode(&_fbData, path.c_str(), &meta)) {
         Serial.printf("[FB] Device registration failed: %s\n",
@@ -83,7 +84,7 @@ bool FirebaseManager::_pushOne(const SensorReading& s, const MLResult& ml,
     data.set("pWarning",      ml.pWarning);
     data.set("pCritical",     ml.pCritical);
     data.set("state",         stateToString(st));
-    data.set("ts",            s.timestampMs);
+    data.set("ts",            (double)time(nullptr) * 1000.0);  // Unix ms for JS Date()
 
     // Update latest reading (overwrite) on /devices/{id}/latest
     String latestPath = _devicePath() + "/latest";
@@ -121,7 +122,7 @@ void FirebaseManager::sendHeartbeat(DeviceState state) {
     if (!_connected || !Firebase.ready()) return;
 
     FirebaseJson hb;
-    hb.set("ts",       (uint32_t)(millis() / 1000));
+    hb.set("ts",       (uint32_t)time(nullptr));
     hb.set("state",    stateToString(state));
     hb.set("heapFree", (uint32_t)ESP.getFreeHeap());
     hb.set("uptime",   (uint32_t)(millis() / 1000));
@@ -183,7 +184,7 @@ void FirebaseManager::pushSignIn(const char* userId, const char* userName,
     data.set("matchScore",  matchScore);
     data.set("success",     success);
     data.set("anomalyScore", anomalyScore);
-    data.set("ts",          (uint32_t)(millis() / 1000));
+    data.set("ts",          (uint32_t)time(nullptr));
 
     String path = String("/signins/") + _deviceId;
     Firebase.RTDB.push(&_fbData, path.c_str(), &data);
@@ -199,7 +200,7 @@ void FirebaseManager::pushEnrollment(const char* userId, const char* name) {
     data.set("userId",      userId);
     data.set("name",        name);
     data.set("deviceId",    _deviceId);
-    data.set("enrolledAt",  (uint32_t)(millis() / 1000));
+    data.set("enrolledAt",  (uint32_t)time(nullptr));
 
     String path = String("/users/") + userId;
     Firebase.RTDB.updateNode(&_fbData, path.c_str(), &data);
@@ -218,7 +219,7 @@ void FirebaseManager::pushBiometricAlert(const char* userId,
     data.set("alertType",   alertType);
     data.set("anomalyScore", anomalyScore);
     data.set("acknowledged", false);
-    data.set("ts",          (uint32_t)(millis() / 1000));
+    data.set("ts",          (uint32_t)time(nullptr));
 
     String path = String("/alerts/") + _deviceId;
     Firebase.RTDB.push(&_fbData, path.c_str(), &data);

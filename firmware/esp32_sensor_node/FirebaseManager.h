@@ -16,6 +16,7 @@
 #include "SensorManager.h"
 #include "MLInference.h"
 #include "StateManager.h"
+#include "ActuatorController.h"
 
 // Ring buffer capacity (readings) — each entry ≈ 60 bytes
 static constexpr uint8_t OFFLINE_QUEUE_SIZE = 30;

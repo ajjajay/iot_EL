@@ -2,63 +2,84 @@
 /*
  * MLInference.h
  * Runs TFLite Micro inference on-device to produce a risk score
- * from [temperature, humidity, light_level] inputs.
+ * from [temperature, humidity, smoke_level] inputs.
  *
- * The model is embedded as a C byte-array in tinyml_model.h.
- * No SD card or network required — runs fully offline.
- *
- * Input tensor:  float32[3]  → [temp_norm, hum_norm, light_norm]
- *                              all normalised to [0, 1]
- * Output tensor: float32[3]  → [p_normal, p_warning, p_critical]
- *                              softmax probabilities summing to 1.0
+ * Define ML_DISABLED before including this header (or in the .ino) to
+ * strip all TFLite code and save ~600 KB of flash. infer() then returns
+ * a threshold-based result instead.
  *
  * Risk score (0.0–1.0) = p_warning * 0.5 + p_critical * 1.0
  */
 
 #include <Arduino.h>
+
+struct MLResult {
+    float pNormal;
+    float pWarning;
+    float pCritical;
+    float riskScore;
+    uint8_t label;
+    bool    valid;
+};
+
+#ifndef ML_DISABLED
+
 #include <TensorFlowLite_ESP32.h>
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/schema/schema_generated.h"
-
-struct MLResult {
-    float pNormal;    // probability of normal class
-    float pWarning;   // probability of warning class
-    float pCritical;  // probability of critical class
-    float riskScore;  // weighted composite: 0.0 (safe) – 1.0 (critical)
-    uint8_t label;    // 0=normal, 1=warning, 2=critical
-    bool    valid;    // false if inference failed
-};
 
 class MLInference {
 public:
     MLInference();
     ~MLInference();
 
-    // Call once in setup() — loads model, allocates tensor arena
     bool begin();
-
-    // Run inference; inputs are raw sensor values (normalisation done inside)
     MLResult infer(float tempC, float humPct, float lightNorm);
 
-    // Normalisation bounds — update if you retrain on different data ranges
     static constexpr float TEMP_MIN  = -10.0f;
     static constexpr float TEMP_MAX  =  60.0f;
     static constexpr float HUM_MIN   =   0.0f;
     static constexpr float HUM_MAX   = 100.0f;
 
 private:
-    // TFLite Micro objects
-    const tflite::Model*          _model;
-    tflite::MicroInterpreter*     _interpreter;
-    TfLiteTensor*                 _inputTensor;
-    TfLiteTensor*                 _outputTensor;
+    const tflite::Model*      _model;
+    tflite::MicroInterpreter* _interpreter;
+    TfLiteTensor*             _inputTensor;
+    TfLiteTensor*             _outputTensor;
 
-    // Working memory for the interpreter — 8 KB is enough for a small MLP
     static constexpr size_t TENSOR_ARENA_SIZE = 8 * 1024;
     uint8_t _tensorArena[TENSOR_ARENA_SIZE];
-
     bool _ready;
 
     float _normalise(float val, float minVal, float maxVal) const;
 };
+
+#else  // ML_DISABLED — stub; threshold-only risk scoring, zero TFLite flash cost
+
+class MLInference {
+public:
+    MLInference() {}
+    ~MLInference() {}
+
+    bool begin() {
+        Serial.println("[ML] TFLite disabled — using threshold rules");
+        return false;
+    }
+
+    // Simple threshold rules matching the training label boundaries
+    MLResult infer(float tempC, float humPct, float smokePct) {
+        MLResult r = {};
+        bool warn = (tempC > 35.0f || humPct > 80.0f || smokePct > 30.0f);
+        bool crit = (tempC > 45.0f || smokePct > 60.0f);
+        r.pCritical = crit ? 1.0f : 0.0f;
+        r.pWarning  = (!crit && warn) ? 1.0f : 0.0f;
+        r.pNormal   = (!crit && !warn) ? 1.0f : 0.0f;
+        r.riskScore = r.pWarning * 0.5f + r.pCritical;
+        r.label     = crit ? 2 : (warn ? 1 : 0);
+        r.valid     = true;
+        return r;
+    }
+};
+
+#endif  // ML_DISABLED

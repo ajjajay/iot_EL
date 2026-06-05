@@ -1,4 +1,7 @@
 #include "MLInference.h"
+
+#ifndef ML_DISABLED
+
 #include "tinyml_model.h"   // g_model[] byte array
 
 MLInference::MLInference() : _model(nullptr), _interpreter(nullptr),
@@ -28,7 +31,7 @@ bool MLInference::begin() {
     resolver.AddQuantize();
 
     static tflite::MicroInterpreter interpreter(
-        _model, resolver, _tensorArena, TENSOR_ARENA_SIZE);
+        _model, resolver, _tensorArena, TENSOR_ARENA_SIZE, nullptr, nullptr, nullptr);
     _interpreter = &interpreter;
 
     TfLiteStatus allocStatus = _interpreter->AllocateTensors();
@@ -101,3 +104,5 @@ float MLInference::_normalise(float val, float minVal, float maxVal) const {
     float norm = (val - minVal) / (maxVal - minVal);
     return constrain(norm, 0.0f, 1.0f);
 }
+
+#endif  // ML_DISABLED

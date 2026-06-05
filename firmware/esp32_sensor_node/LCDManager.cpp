@@ -13,27 +13,37 @@ void LCDManager::begin() {
     Serial.println("[LCD] LCDManager ready");
 }
 
-void LCDManager::tickSensorScreens(const SensorReading& s) {
+void LCDManager::tickSensorScreens(const SensorReading& s,
+                                    float riskScore, uint8_t mlLabel,
+                                    const char* state) {
     if (millis() - _lastSwitch < SCREEN_MS) return;
     _lastSwitch = millis();
 
     char l1[17], l2[17];
-    switch (_screen % 3) {
+    switch (_screen % 4) {
         case 0:  // Temperature + Humidity
-            snprintf(l1, 17, "Temp: %5.1f C   ", s.temperatureC);
-            snprintf(l2, 17, "Humi: %5.1f %%  ", s.humidityPct);
+            snprintf(l1, 17, "T:%4.1fC  H:%4.1f%%", s.temperatureC, s.humidityPct);
+            snprintf(l2, 17, "%-16s", state);
             break;
-        case 1:  // Smoke
-            snprintf(l1, 17, "Smoke:%5.1f %%  ", s.smokePct);
-            snprintf(l2, 17, s.smokePct > 50.0f ? "  !! DANGER !!  " : "   Level: OK    ");
+        case 1:  // Smoke + distance
+            snprintf(l1, 17, "Smoke: %5.1f %%  ", s.smokePct);
+            if (s.smokePct > 50.0f)
+                snprintf(l2, 17, "  !! DANGER !!  ");
+            else if (s.distanceCm < 0)
+                snprintf(l2, 17, "Dist: no object ");
+            else
+                snprintf(l2, 17, "Dist: %5.1f cm  ", s.distanceCm);
             break;
-        case 2:  // Distance
-            if (s.distanceCm < 0) {
-                snprintf(l1, 17, "Dist: out range ");
-            } else {
-                snprintf(l1, 17, "Dist:%6.1f cm  ", s.distanceCm);
-            }
+        case 2: {  // Risk score + ML label
+            static const char* lblStr[] = {"NORMAL", "WARNING", "CRITIC"};
+            const char* lbl = (mlLabel < 3) ? lblStr[mlLabel] : "------";
+            snprintf(l1, 17, "Risk: %3.0f%%  %-6s", riskScore * 100.0f, lbl);
             snprintf(l2, 17, "Press key: auth ");
+            break;
+        }
+        case 3:  // Uptime
+            snprintf(l1, 17, "Up: %7lus     ", millis() / 1000UL);
+            snprintf(l2, 17, "%-16s", state);
             break;
     }
     _screen++;

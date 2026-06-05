@@ -24,7 +24,10 @@ public:
 
     // Call each loop() to rotate through sensor screens in MONITORING.
     // Stop calling (or call showMessage/showAuth) to freeze the display.
-    void tickSensorScreens(const SensorReading& s);
+    void tickSensorScreens(const SensorReading& s,
+                           float riskScore = 0.0f,
+                           uint8_t mlLabel = 0,
+                           const char* state = "MONITORING");
 
     // Generic two-line message; persists until next call
     void showMessage(const char* line1, const char* line2 = "");

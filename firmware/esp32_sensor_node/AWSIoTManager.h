@@ -67,8 +67,8 @@ public:
     bool isConnected() const;
 
 private:
-    WiFiClientSecure _wifiClient;
-    PubSubClient     _mqtt;
+    WiFiClientSecure       _wifiClient;
+    mutable PubSubClient   _mqtt;
 
     const char* _endpoint;
     const char* _thingName;

@@ -25,6 +25,7 @@
  */
 
 #include <WiFi.h>
+#include <time.h>
 #include "ConfigManager.h"
 #include "StateManager.h"
 #include "SensorManager.h"
@@ -77,8 +78,9 @@ char pendingEnrollUserId[32] = {};
 char pendingEnrollName[64]   = {};
 bool enrollPending           = false;
 
-// ── Latest sensor reading (kept for LCD cycling) ──────────────────────────────
+// ── Latest sensor reading + ML result (kept for LCD cycling) ─────────────────
 SensorReading lastEnvReading;
+MLResult      lastMlResult;
 
 // ── WiFi helper ───────────────────────────────────────────────────────────────
 static bool connectWifi(const char* ssid, const char* pass,
@@ -283,7 +285,28 @@ void setup() {
     fsm.transition(DeviceState::CONNECTING);
     lcd->showMessage("Connecting...", "WiFi");
     bool wifiOk = connectWifi(c.wifiSsid, c.wifiPassword);
-    bool fbOk   = false;
+
+    if (wifiOk) {
+        // Show IP on LCD so you can confirm connectivity
+        lcd->showMessage("WiFi OK", WiFi.localIP().toString().c_str());
+        delay(2000);
+
+        // NTP time sync — needed for correct Firebase timestamps
+        lcd->showMessage("Syncing NTP...", "pool.ntp.org");
+        configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+        uint32_t ntpStart = millis();
+        while (time(nullptr) < 1000000000UL && millis() - ntpStart < 8000) delay(200);
+        if (time(nullptr) > 1000000000UL) {
+            Serial.printf("[NTP] Synced — Unix time: %lu\n", (unsigned long)time(nullptr));
+            lcd->showMessage("NTP synced", "Time OK");
+        } else {
+            Serial.println("[NTP] Sync failed — timestamps will be approximate");
+            lcd->showMessage("NTP failed", "Check internet");
+        }
+        delay(1000);
+    }
+
+    bool fbOk = false;
     if (wifiOk) {
         lcd->showMessage("Firebase", "Connecting...");
         fbOk = firebase->begin();
@@ -390,7 +413,8 @@ void loop() {
 
         // Cycle LCD through sensor readings
         if (lastEnvReading.valid) {
-            lcd->tickSensorScreens(lastEnvReading);
+            lcd->tickSensorScreens(lastEnvReading, lastMlResult.riskScore,
+                                   lastMlResult.label, stateToString(fsm.current()));
         }
     }
 
@@ -440,14 +464,31 @@ void loop() {
         SensorReading env = sensors->readNow();
         if (env.valid) {
             lastEnvReading = env;
-            // Pass smokePct (0–1) as 3rd input to the env ML model
             MLResult envMl = ml.infer(env.temperatureC, env.humidityPct,
                                        env.smokePct / 100.0f);
+            lastMlResult   = envMl;
+
+            // ── Serial debug dump ─────────────────────────────────────────────
+            Serial.println("┌─────────────────────────────────────────┐");
+            Serial.printf( "│ State     : %-28s│\n", stateToString(fsm.current()));
+            Serial.printf( "│ Temp      : %.2f °C                      │\n", env.temperatureC);
+            Serial.printf( "│ Humidity  : %.2f %%                       │\n", env.humidityPct);
+            Serial.printf( "│ Smoke raw : %u  (%.1f %%)                 │\n", env.smokeRaw, env.smokePct);
+            Serial.printf( "│ Distance  : %.1f cm                       │\n", env.distanceCm);
+            Serial.printf( "│ Risk score: %.3f  label=%d (%s)       │\n",
+                           envMl.riskScore, envMl.label,
+                           envMl.label == 0 ? "NORMAL " : envMl.label == 1 ? "WARNING" : "CRITICAL");
+            Serial.printf( "│ p(norm)   : %.3f  p(warn): %.3f  p(crit): %.3f │\n",
+                           envMl.pNormal, envMl.pWarning, envMl.pCritical);
+            Serial.printf( "│ Unix time : %lu                           │\n", (unsigned long)time(nullptr));
+            Serial.printf( "│ Heap free : %u bytes                      │\n", (uint32_t)ESP.getFreeHeap());
+            Serial.println("└─────────────────────────────────────────┘");
+            // ─────────────────────────────────────────────────────────────────
+
             firebase->pushReading(env, envMl, fsm.current());
             if (awsIoT && awsIoT->isConnected())
                 awsIoT->publishReading(env, envMl, fsm.current());
 
-            // Env risk alert
             if (envMl.riskScore >= c.mlRiskThreshold)
                 fsm.transition(DeviceState::ALERT);
         }
