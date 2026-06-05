@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { ref, set, push, remove } from 'firebase/database';
 import { db, auth, DASH_EMAIL, DASH_PASSWORD } from './firebase.js';
@@ -10,17 +11,54 @@ import { useAlerts }   from './hooks/useAlerts.js';
 import { makeDemoState, simulateDemoTick } from './utils/demo.js';
 import { useToast }    from './components/ToastContainer.jsx';
 
-import SummaryStrip    from './components/SummaryStrip.jsx';
-import DeviceGrid      from './components/DeviceGrid.jsx';
-import SignInLog       from './components/SignInLog.jsx';
-import SecurityAlerts  from './components/SecurityAlerts.jsx';
-import EnrolledUsers   from './components/EnrolledUsers.jsx';
-import EnrollPanel     from './components/EnrollPanel.jsx';
-import WebcamAuth      from './components/WebcamAuth.jsx';
-import SensorCharts    from './components/SensorCharts.jsx';
-import HealthTable     from './components/HealthTable.jsx';
+import Sidebar       from './components/Sidebar.jsx';
+import OverviewPage  from './pages/OverviewPage.jsx';
+import SensorsPage   from './pages/SensorsPage.jsx';
+import AuthPage      from './pages/AuthPage.jsx';
+import UsersPage     from './pages/UsersPage.jsx';
+import AlertsPage    from './pages/AlertsPage.jsx';
+import VoicePage     from './pages/VoicePage.jsx';
+import HealthPage    from './pages/HealthPage.jsx';
 
-export default function App() {
+const PAGE_TITLES = {
+  '/':        'Overview',
+  '/devices': 'Devices & Sensors',
+  '/auth':    'Biometric Auth',
+  '/users':   'Enrolled Users',
+  '/alerts':  'Security Alerts',
+  '/voice':   'Voice Assistant',
+  '/health':  'Device Health',
+};
+
+function Topbar({ anomalyCount, devicesOnline, deviceTotal, theme, onTheme, onRefresh }) {
+  const { pathname } = useLocation();
+  const title = PAGE_TITLES[pathname] ?? 'Dashboard';
+  return (
+    <header className="topbar">
+      <div className="topbar-left">
+        <h1 className="page-title">{title}</h1>
+        <span className={`status-pill ${anomalyCount > 0 ? 'status-pill-err' : 'status-pill-ok'}`}>
+          {anomalyCount > 0 ? `⚠ ${anomalyCount} Alert${anomalyCount > 1 ? 's' : ''}` : '● Live'}
+        </span>
+      </div>
+      <div className="topbar-right">
+        <button className="icon-btn" title="Toggle theme" onClick={onTheme}>
+          {theme === 'dark' ? '☀' : '☾'}
+        </button>
+        <button className="icon-btn" title="Refresh" onClick={onRefresh}>↻</button>
+        <div className="topbar-user">
+          <div className="topbar-avatar">A</div>
+          <div className="topbar-user-info">
+            <span className="topbar-user-name">Admin</span>
+            <span className="topbar-user-role">{devicesOnline}/{deviceTotal} Online</span>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function AppInner() {
   const showToast = useToast();
 
   const [theme,     setTheme]     = useState('light');
@@ -29,22 +67,17 @@ export default function App() {
   const [demoState, setDemoState] = useState(null);
   const [tick,      setTick]      = useState(0);
 
-  // Firebase auth on mount
   useEffect(() => {
     signInWithEmailAndPassword(auth, DASH_EMAIL, DASH_PASSWORD)
-      .then(() => {
-        setLiveDb(db);
-        showToast('Connected to Firebase', 'ok');
-      })
+      .then(() => { setLiveDb(db); showToast('Connected to Firebase', 'ok'); })
       .catch(err => {
-        console.warn('[FB] Firebase init failed:', err.message);
-        showToast('Firebase unavailable — running in demo mode', 'info');
+        console.warn('[FB]', err.message);
+        showToast('Firebase unavailable — demo mode', 'info');
         setIsDemo(true);
         setDemoState(makeDemoState());
       });
   }, []);
 
-  // Demo simulation
   useEffect(() => {
     if (!isDemo) return;
     const t = setInterval(() => {
@@ -56,26 +89,20 @@ export default function App() {
     return () => clearInterval(t);
   }, [isDemo]);
 
-  // Tick every 5 s to refresh the "Last Update" clock in SummaryStrip
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 5000);
     return () => clearInterval(t);
   }, []);
 
-  // Apply theme to body
-  useEffect(() => {
-    document.body.dataset.theme = theme;
-  }, [theme]);
+  useEffect(() => { document.body.dataset.theme = theme; }, [theme]);
 
-  // Live Firebase hooks (return empty state when liveDb is null)
-  const liveDevices = useDevices(liveDb);
+  const liveDevices  = useDevices(liveDb);
   const liveReadings = useReadings(liveDb);
   const liveSignins  = useSignins(liveDb);
   const liveUsers    = useUsers(liveDb);
   const [liveAlerts, clearLiveAlerts] = useAlerts(liveDb);
 
-  // Resolve final data (demo overrides live when in demo mode)
-  const devices = isDemo ? (demoState?.devices  ?? {}) : liveDevices;
+  const devices  = isDemo ? (demoState?.devices  ?? {}) : liveDevices;
   const readings = isDemo ? (demoState?.readings ?? {}) : liveReadings;
   const signins  = isDemo ? (demoState?.signins  ?? {}) : liveSignins;
   const users    = isDemo ? (demoState?.users    ?? {}) : liveUsers;
@@ -85,16 +112,10 @@ export default function App() {
   const devicesOnline = deviceList.filter(d => d.online).length;
   const anomalyCount  = alerts.filter(a => !!a.alertType && a.alertType !== 'high_env_risk').length;
 
-  // ── Commands ───────────────────────────────────────────────────────────────
-
   const handleRemoveUser = useCallback((userId) => {
     if (!window.confirm(`Remove enrolled user "${userId}"?`)) return;
     if (isDemo) {
-      setDemoState(prev => {
-        const u = { ...prev.users };
-        delete u[userId];
-        return { ...prev, users: u };
-      });
+      setDemoState(prev => { const u = { ...prev.users }; delete u[userId]; return { ...prev, users: u }; });
       showToast(`[Demo] User ${userId} removed`, 'info');
       return;
     }
@@ -107,10 +128,7 @@ export default function App() {
     if (isDemo) {
       setDemoState(prev => ({
         ...prev,
-        users: {
-          ...prev.users,
-          [userId]: { userId, name, deviceId, enrolledAt: Date.now() / 1000, active: true },
-        },
+        users: { ...prev.users, [userId]: { userId, name, deviceId, enrolledAt: Date.now() / 1000, active: true } },
       }));
       showToast(`[Demo] Enrollment command sent for "${name}"`, 'ok');
       return Promise.resolve();
@@ -120,40 +138,14 @@ export default function App() {
       .catch(e  => { showToast(`Command failed: ${e.message}`, 'alert'); throw e; });
   }, [isDemo, showToast]);
 
-  const handleRelayCommand = useCallback((deviceId, value) => {
-    if (isDemo) {
-      setDemoState(prev => ({
-        ...prev,
-        devices: {
-          ...prev.devices,
-          [deviceId]: { ...prev.devices[deviceId], commands: { relayOverride: value } },
-        },
-      }));
-      showToast(`[Demo] Relay ${deviceId} → ${value}`, 'info');
-      return;
-    }
-    set(ref(db, `/devices/${deviceId}/commands/relayOverride`), value)
-      .then(() => showToast(`Relay command sent to ${deviceId}: ${value}`, 'ok'))
-      .catch(e  => showToast(`Command failed: ${e.message}`, 'alert'));
-  }, [isDemo, showToast]);
-
-  // Webcam authentication: log sign-in + unlock relay on match
   const handleWebcamAuth = useCallback(async (deviceId, result) => {
     if (isDemo) {
-      showToast(
-        result.matched ? `[Demo] Access granted: ${result.userName}` : '[Demo] Access denied',
-        result.matched ? 'ok' : 'alert'
-      );
+      showToast(result.matched ? `[Demo] Access granted: ${result.userName}` : '[Demo] Access denied', result.matched ? 'ok' : 'alert');
       return;
     }
     await push(ref(db, `/signins/${deviceId}`), {
-      userId:      result.userId   ?? 'unknown',
-      userName:    result.userName ?? 'Unknown',
-      deviceId,
-      matchScore:  result.score,
-      success:     result.matched,
-      anomalyScore: 0,
-      ts:          Date.now(),
+      userId: result.userId ?? 'unknown', userName: result.userName ?? 'Unknown',
+      deviceId, matchScore: result.score, success: result.matched, anomalyScore: 0, ts: Date.now(),
     });
     if (result.matched) {
       await set(ref(db, `/devices/${deviceId}/commands/relayOverride`), 'ON');
@@ -163,25 +155,16 @@ export default function App() {
     }
   }, [isDemo, showToast]);
 
-  // Webcam enrollment: store template + user record directly in Firebase
   const handleWebcamEnroll = useCallback(async (deviceId, userId, name, template) => {
     if (isDemo) {
       setDemoState(prev => ({
         ...prev,
-        users: {
-          ...prev.users,
-          [userId]: { userId, name, deviceId, enrolledAt: Date.now(), active: true, template },
-        },
+        users: { ...prev.users, [userId]: { userId, name, deviceId, enrolledAt: Date.now(), active: true, template } },
       }));
       showToast(`[Demo] ${name} enrolled via webcam`, 'ok');
       return;
     }
-    await set(ref(db, `/users/${userId}`), {
-      userId, name, deviceId,
-      enrolledAt: Date.now(),
-      active: true,
-      template,
-    });
+    await set(ref(db, `/users/${userId}`), { userId, name, deviceId, enrolledAt: Date.now(), active: true, template });
     showToast(`${name} enrolled via webcam`, 'ok');
   }, [isDemo, showToast]);
 
@@ -197,72 +180,58 @@ export default function App() {
 
   return (
     <div className="app-layout">
+      <Sidebar anomalyCount={anomalyCount} />
 
       <div className="main-area">
-        {/* Top bar */}
-        <header className="topbar">
-          <div className="topbar-left">
-            <h1 className="page-title">Dashboard</h1>
-            <span className={`status-pill ${anomalyCount > 0 ? 'status-pill-err' : 'status-pill-ok'}`}>
-              {anomalyCount > 0 ? `⚠ ${anomalyCount} Alert${anomalyCount > 1 ? 's' : ''}` : '● Live'}
-            </span>
-          </div>
-          <div className="topbar-right">
-            <button className="icon-btn" title="Toggle theme" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
-              {theme === 'dark' ? '☀' : '☾'}
-            </button>
-            <button className="icon-btn" title="Refresh" onClick={handleRefresh}>↻</button>
-            <div className="topbar-user">
-              <div className="topbar-avatar">A</div>
-              <div className="topbar-user-info">
-                <span className="topbar-user-name">Admin</span>
-                <span className="topbar-user-role">{devicesOnline}/{deviceList.length} Online</span>
-              </div>
-            </div>
-          </div>
-        </header>
+        <Topbar
+          anomalyCount={anomalyCount}
+          devicesOnline={devicesOnline}
+          deviceTotal={deviceList.length}
+          theme={theme}
+          onTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+          onRefresh={handleRefresh}
+        />
 
-        {/* Main scrollable content */}
         <main className="content">
-          <SummaryStrip
-            key={tick}
-            devices={devices}
-            signins={signins}
-            users={users}
-            alerts={alerts}
-          />
-
-          <DeviceGrid devices={devices} signins={signins} />
-
-          <SensorCharts readings={readings} devices={devices} />
-
-          <div className="two-col">
-            <SignInLog signins={signins} devices={devices} />
-            <SecurityAlerts alerts={alerts} onClear={handleClearAlerts} />
-          </div>
-
-          <section className="section">
-            <h2 className="section-title">Biometric Authentication</h2>
-            <WebcamAuth
-              devices={devices}
-              users={users}
-              onResult={handleWebcamAuth}
-            />
-          </section>
-
-          <section className="section">
-            <h2 className="section-title">Enrolled Users</h2>
-            <EnrolledUsers users={users} onRemove={handleRemoveUser} />
-            <EnrollPanel
-              devices={devices}
-              onSendEnroll={handleSendEnroll}
-              onWebcamEnroll={handleWebcamEnroll}
-            />
-          </section>
-
-          <HealthTable devices={devices} />
+          <Routes>
+            <Route path="/" element={
+              <OverviewPage devices={devices} signins={signins} users={users} alerts={alerts} tick={tick} />
+            } />
+            <Route path="/devices" element={
+              <SensorsPage readings={readings} devices={devices} />
+            } />
+            <Route path="/auth" element={
+              <AuthPage devices={devices} users={users} signins={signins} onResult={handleWebcamAuth} />
+            } />
+            <Route path="/users" element={
+              <UsersPage
+                devices={devices} users={users}
+                onRemove={handleRemoveUser}
+                onSendEnroll={handleSendEnroll}
+                onWebcamEnroll={handleWebcamEnroll}
+              />
+            } />
+            <Route path="/alerts" element={
+              <AlertsPage alerts={alerts} signins={signins} devices={devices} onClear={handleClearAlerts} />
+            } />
+            <Route path="/voice" element={
+              <VoicePage devices={devices} users={users} alerts={alerts} />
+            } />
+            <Route path="/health" element={
+              <HealthPage devices={devices} />
+            } />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
         </main>
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppInner />
+    </BrowserRouter>
   );
 }

@@ -10,12 +10,20 @@ export default function EnrolledUsers({ users, onRemove }) {
       ) : userList.map(u => {
         const enrollDate = formatDate(u.enrolledAt);
         return (
-          <div key={u.userId} className="enrolled-card">
+          <div key={u.userId} className={`enrolled-card${u.active === false ? ' enrolled-card--inactive' : ''}`}>
             <div className="enrolled-avatar">
-              {u.name ? u.name[0].toUpperCase() : '?'}
+              {u.avatarUrl
+                ? <img src={u.avatarUrl} alt={u.name} className="enrolled-avatar-img" onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                : null}
+              <span className="enrolled-avatar-initial" style={u.avatarUrl ? { display: 'none' } : {}}>
+                {u.name ? u.name[0].toUpperCase() : '?'}
+              </span>
             </div>
             <div className="enrolled-info">
-              <div className="enrolled-name">{u.name || u.userId}</div>
+              <div className="enrolled-name">
+                {u.name || u.userId}
+                {u.active === false && <span className="enrolled-inactive-badge">Inactive</span>}
+              </div>
               <div className="enrolled-id"><code>{u.userId}</code></div>
               <div className="enrolled-meta">
                 Device: {u.deviceId || '—'} &nbsp;•&nbsp; Enrolled: {enrollDate}

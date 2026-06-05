@@ -2,18 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { useToast } from './ToastContainer.jsx';
 import { extractFeatures, averageFeatures } from '../utils/irisFeatures.js';
 
-/**
- * Enrollment panel with two modes:
- *
- *   "Device Camera"  — sends a command to the ESP32; device captures the iris
- *                      locally via its OV2640 (original flow, for when the
- *                      ESP32-CAM module is in use).
- *
- *   "Laptop Camera"  — captures 5 averaged frames from the laptop webcam,
- *                      derives the template in the browser, and stores it
- *                      directly in Firebase /users/{userId}. No ESP32 camera
- *                      required.
- */
 export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
   const showToast = useToast();
 
@@ -22,16 +10,24 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
   const [userId,   setUserId]   = useState('');
   const [name,     setName]     = useState('');
 
-  // Webcam enrollment state
   const videoRef  = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
-  const [camPhase,  setCamPhase]  = useState('idle'); // idle|live|capturing|done
-  const [progress,  setProgress]  = useState(0);
-  const [camErr,    setCamErr]    = useState('');
-  const [template,  setTemplate]  = useState(null);
+
+  const [camPhase, setCamPhase] = useState('idle'); // idle | live | capturing | done
+  const [progress, setProgress] = useState(0);
+  const [camErr,   setCamErr]   = useState('');
+  const [template, setTemplate] = useState(null);
 
   const deviceIds = Object.keys(devices);
+
+  // Attach stream once video element is in the DOM
+  useEffect(() => {
+    if (camPhase !== 'idle' && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [camPhase]);
 
   useEffect(() => () => stopStream(), []);
 
@@ -49,7 +45,7 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
     setMode(m);
   }
 
-  // ── Device camera mode ────────────────────────────────────────────────────
+  // ── Device camera mode ──────────────────────────────────────────────────────
 
   async function handleDeviceEnroll() {
     const uid = userId.trim().replace(/\s+/g, '_');
@@ -62,17 +58,26 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
     } catch {}
   }
 
-  // ── Webcam mode ───────────────────────────────────────────────────────────
+  // ── Laptop camera mode ──────────────────────────────────────────────────────
 
   async function openCamera() {
     setCamErr('');
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCamErr('Camera API unavailable — open the page on https://localhost and accept the certificate warning.');
+      return;
+    }
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: true });
+      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
       streamRef.current = s;
-      videoRef.current.srcObject = s;
-      setCamPhase('live');
-    } catch {
-      setCamErr('Camera access denied or unavailable');
+      setCamPhase('live'); // video element renders → useEffect attaches stream
+    } catch (err) {
+      if (err.name === 'NotAllowedError') {
+        setCamErr('Camera permission denied. Allow access in the browser address bar.');
+      } else if (err.name === 'NotFoundError') {
+        setCamErr('No camera found on this device.');
+      } else {
+        setCamErr(`Camera error: ${err.message}`);
+      }
     }
   }
 
@@ -92,7 +97,7 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
     setCamPhase('capturing');
     const frames = [];
     for (let i = 0; i < 5; i++) {
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 350));
       frames.push(extractFeatures(videoRef.current, canvasRef.current));
       setProgress(i + 1);
     }
@@ -111,35 +116,32 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
     }
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="enroll-panel">
       <h3 className="enroll-title">Enroll New User</h3>
 
-      {/* Mode tabs */}
       <div className="enroll-tabs">
-        <button className={`enroll-tab ${mode === 'webcam'  ? 'active' : ''}`} onClick={() => switchMode('webcam')}>
+        <button className={`enroll-tab ${mode === 'webcam' ? 'active' : ''}`} onClick={() => switchMode('webcam')}>
           Laptop Camera
         </button>
-        <button className={`enroll-tab ${mode === 'device'  ? 'active' : ''}`} onClick={() => switchMode('device')}>
+        <button className={`enroll-tab ${mode === 'device' ? 'active' : ''}`} onClick={() => switchMode('device')}>
           Device Camera
         </button>
       </div>
 
-      {/* Shared input fields */}
       <div className="enroll-form">
         <select className="select" value={deviceId} onChange={e => setDeviceId(e.target.value)}>
-          <option value="">Select device...</option>
+          <option value="">Select device…</option>
           {deviceIds.map(id => <option key={id} value={id}>{id}</option>)}
         </select>
-        <input type="text" className="input" placeholder="User ID  (e.g. john_doe)"
+        <input type="text" className="input" placeholder="User ID (e.g. john_doe)"
           value={userId} onChange={e => setUserId(e.target.value)} />
         <input type="text" className="input" placeholder="Full Name (e.g. John Doe)"
           value={name} onChange={e => setName(e.target.value)} />
       </div>
 
-      {/* ── Device camera mode ── */}
       {mode === 'device' && (
         <div>
           <p className="section-subtitle">
@@ -151,33 +153,26 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
         </div>
       )}
 
-      {/* ── Laptop camera mode ── */}
       {mode === 'webcam' && (
         <div className="webcam-enroll-body">
           <p className="section-subtitle">
             Captures 5 frames from your laptop camera, averages the iris descriptor,
-            and stores the template directly in Firebase — no ESP32 camera required.
+            and stores the template directly in Firebase.
           </p>
 
-          {camPhase === 'idle' && (
-            <>
-              {camErr && <p className="webcam-err">{camErr}</p>}
-              <button className="btn btn-primary" onClick={openCamera}>Open Camera</button>
-            </>
-          )}
-
-          {camPhase !== 'idle' && (
+          {/* Always render video+canvas so refs exist when state changes */}
+          <div style={{ display: camPhase === 'idle' ? 'none' : 'block' }}>
             <div className="webcam-live">
               <div className="webcam-video-wrap">
                 <video ref={videoRef} autoPlay playsInline muted className="webcam-video" />
                 <canvas ref={canvasRef} style={{ display: 'none' }} />
                 {camPhase === 'capturing' && (
                   <div className="webcam-overlay overlay-capture">
-                    Capturing {progress} / 5...
+                    Capturing {progress} / 5…
                   </div>
                 )}
                 {camPhase === 'done' && (
-                  <div className="webcam-overlay overlay-ok">Template ready</div>
+                  <div className="webcam-overlay overlay-ok">✓ Template ready</div>
                 )}
               </div>
 
@@ -197,6 +192,13 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
                 </button>
               </div>
             </div>
+          </div>
+
+          {camPhase === 'idle' && (
+            <>
+              {camErr && <p className="webcam-err">{camErr}</p>}
+              <button className="btn btn-primary" onClick={openCamera}>Open Camera</button>
+            </>
           )}
         </div>
       )}
