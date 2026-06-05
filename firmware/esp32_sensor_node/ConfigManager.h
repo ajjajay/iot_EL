@@ -34,10 +34,10 @@ struct DeviceConfig {
 
     // Sensor pins
     uint8_t dhtPin;
-    uint8_t ldrPin;       // ADC pin (analog)
-    uint8_t relayPin;
-    uint8_t ledPin;
-    uint8_t dhtType;      // 11 or 22
+    uint8_t dhtType;         // 11 or 22
+    uint8_t smokePin;        // MQ-2 analog ADC pin
+    uint8_t ultrasonicTrig;  // HC-SR04 trigger pin
+    uint8_t ultrasonicEcho;  // HC-SR04 echo pin
 
     // Timing
     uint32_t sensorIntervalMs;    // how often to read sensors
@@ -54,15 +54,13 @@ struct DeviceConfig {
     float mlRiskThreshold;        // 0.0–1.0; above this → ALERT state
 
     // ── Biometric / Iris ──────────────────────────────────────────────────────
-    uint8_t  authButtonPin;        // GPIO: short-press triggers authentication
-    uint8_t  enrollButtonPin;      // GPIO: long-press + Firebase cmd → enrollment
-    uint16_t buttonDebounceMs;     // debounce window in ms
-    uint16_t buttonLongPressMs;    // hold duration (ms) to trigger enrollment mode
-
+    bool     cameraEnabled;        // false = skip OV2640; iris auth via web dashboard
     float    irisMatchThreshold;   // L2 distance; below this = authenticated
     uint8_t  irisEnrollFrames;     // frames averaged per enrollment capture
+    uint32_t authDisplayMs;        // how long AUTHENTICATED/REJECTED shows (ms)
 
-    uint32_t authDisplayMs;        // how long AUTHENTICATED/REJECTED LED shows (ms)
+    // ── Keypad PIN authentication ─────────────────────────────────────────────
+    char     accessPin[8];         // PIN for keypad-based local auth (default "1234")
 
     // ── Anomaly detection ─────────────────────────────────────────────────────
     float    anomalyScoreThreshold; // 0.0–1.0; above this → ALERT + agent call

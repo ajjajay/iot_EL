@@ -66,8 +66,9 @@ void AWSIoTManager::publishReading(const SensorReading& s, const MLResult& ml,
     doc["deviceId"]     = _thingName;
     doc["temperatureC"] = s.temperatureC;
     doc["humidityPct"]  = s.humidityPct;
-    doc["lightRaw"]     = s.lightRaw;
-    doc["lightNorm"]    = s.lightNorm;
+    doc["smokeRaw"]     = s.smokeRaw;
+    doc["smokePct"]     = s.smokePct;
+    doc["distanceCm"]   = s.distanceCm;
     doc["riskScore"]    = ml.riskScore;
     doc["mlLabel"]      = ml.label;
     doc["pNormal"]      = ml.pNormal;
@@ -97,7 +98,8 @@ void AWSIoTManager::_publishShadow(const SensorReading& s, const MLResult& ml,
     JsonObject reported = doc.createNestedObject("state").createNestedObject("reported");
     reported["temperatureC"] = s.temperatureC;
     reported["humidityPct"]  = s.humidityPct;
-    reported["lightNorm"]    = s.lightNorm;
+    reported["smokePct"]     = s.smokePct;
+    reported["distanceCm"]   = s.distanceCm;
     reported["riskScore"]    = ml.riskScore;
     reported["mlLabel"]      = ml.label;
     reported["state"]        = stateToString(state);

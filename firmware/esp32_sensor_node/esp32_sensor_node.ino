@@ -1,82 +1,84 @@
 /*
  * esp32_sensor_node.ino
  * ─────────────────────────────────────────────────────────────────────────────
- * Smart Iris Biometric Access Control System — ESP32-CAM Firmware
+ * Iris Biometric Access Control — ESP32 Firmware
  *
- * Architecture:
- *   setup()  → INIT → CONNECTING → READY → MONITORING
+ * Hardware (current build):
+ *   DHT11        — temperature + humidity  (pin 4)
+ *   MQ-2         — smoke sensor            (pin 32, analog)
+ *   HC-SR04      — ultrasonic distance     (TRIG=5, ECHO=18)
+ *   16×2 I2C LCD — status display          (SDA=21, SCL=22, addr=0x27)
+ *   3×4 Keypad   — PIN authentication      (ROW1-4: 13,12,14,27  COL1-3: 26,25,33)
  *
- *   MONITORING (idle)
- *     │ short button press         │ Firebase enroll command
- *     ▼                            ▼
- *   AUTHENTICATING              ENROLLING
- *     │ match         │ no match   │ done
- *     ▼               ▼            ▼
- *   AUTHENTICATED  REJECTED     MONITORING
- *     │ anomaly score high
- *     ▼
- *   ALERT  ──(AI agent notified)──► MONITORING
+ * Authentication:
+ *   Local  — keypad PIN (default "1234", override in config.json "accessPin")
+ *   Remote — laptop webcam via web dashboard (signs in + sends Firebase relay cmd)
  *
- * Sign-in data flow:
- *   ESP32-CAM → IrisCamera → BiometricManager (match)
- *     ↓                                         ↓
- *   AnomalyDetector                        AWSIoTManager (MQTT telemetry)
- *     ↓ anomaly                                 ↓
- *   AlertManager ──► AWS IoT → Lambda → Bedrock Agent → User notification
- *     ↓
- *   FirebaseManager (history + alerts log)
+ * Data flow:
+ *   ESP32 → Firebase RTDB → Dashboard (live sensor charts, sign-in log, alerts)
+ *   ESP32 → AWS IoT Core  → Lambda → Bedrock Agent → SNS notification
  *
  * Required Arduino Libraries:
- *   - Firebase ESP Client (mobizt)
- *   - ArduinoJson (Benoit Blanchon)
- *   - PubSubClient (Nick O'Leary)
- *   - TensorFlowLite_ESP32 (for legacy env. ML — can be disabled)
- *   - ESP32 camera driver (bundled with ESP32 Arduino core ≥ 2.0.11)
- *
- * Board: AI Thinker ESP32-CAM, 240 MHz, 4 MB Flash + 4 MB PSRAM
- *        Partition: "Huge APP" (3 MB app, 1 MB SPIFFS)
+ *   DHT sensor library (Adafruit), Firebase ESP Client (mobizt),
+ *   ArduinoJson (≥6), PubSubClient, LiquidCrystal I2C, Keypad,
+ *   TensorFlowLite_ESP32 (optional — env risk score)
  */
 
 #include <WiFi.h>
 #include "ConfigManager.h"
 #include "StateManager.h"
 #include "SensorManager.h"
-#include "ActuatorController.h"
+#include "ActuatorController.h"   // stub — keeps RelayState/LedPattern enums
 #include "FirebaseManager.h"
 #include "MLInference.h"
 #include "aws_certificates.h"
 #include "AWSIoTManager.h"
+#include "AlertManager.h"
+#include "LCDManager.h"
+#include "KeypadManager.h"
+
+// Camera / biometric modules — only compiled and used when cameraEnabled = true
 #include "IrisCamera.h"
 #include "BiometricManager.h"
 #include "AnomalyDetector.h"
-#include "AlertManager.h"
 
 // ── Module instances ──────────────────────────────────────────────────────────
-ConfigManager        config;
-StateManager         fsm;
-SensorManager*       sensors    = nullptr;
-ActuatorController*  actuators  = nullptr;
-FirebaseManager*     firebase   = nullptr;
-AWSIoTManager*       awsIoT     = nullptr;
-MLInference          ml;
-IrisCamera*          camera     = nullptr;
-BiometricManager*    biometric  = nullptr;
-AnomalyDetector*     anomaly    = nullptr;
-AlertManager*        alertMgr   = nullptr;
+ConfigManager         config;
+StateManager          fsm;
+SensorManager*        sensors   = nullptr;
+FirebaseManager*      firebase  = nullptr;
+AWSIoTManager*        awsIoT    = nullptr;
+MLInference           ml;
+LCDManager*           lcd       = nullptr;
+KeypadManager*        keypad    = nullptr;
+AlertManager*         alertMgr  = nullptr;
+AnomalyDetector*      anomaly   = nullptr;
+
+// Camera / biometric (null when cameraEnabled = false)
+IrisCamera*           camera    = nullptr;
+BiometricManager*     biometric = nullptr;
+
+// Needed by handleEnrolling / handleAuthenticating (iris path) — stub, does nothing
+ActuatorController    actuators;
 
 // ── Timing ────────────────────────────────────────────────────────────────────
 unsigned long lastHeartbeatMs  = 0;
 unsigned long lastCommandMs    = 0;
 unsigned long lastEnvSensorMs  = 0;
 
-// ── Button state ──────────────────────────────────────────────────────────────
-unsigned long buttonPressedAt  = 0;
-bool          buttonWasPressed = false;
+// ── PIN auth state ────────────────────────────────────────────────────────────
+char          pinBuf[8]        = {};
+uint8_t       pinLen           = 0;
+bool          pinWaiting       = false;
+unsigned long pinAuthStartMs   = 0;
 
-// ── Pending enrollment ────────────────────────────────────────────────────────
+// ── Enrollment pending (from Firebase dashboard command) ──────────────────────
 char pendingEnrollUserId[32] = {};
 char pendingEnrollName[64]   = {};
 bool enrollPending           = false;
+
+// ── Latest sensor reading (kept for LCD cycling) ──────────────────────────────
+SensorReading lastEnvReading;
 
 // ── WiFi helper ───────────────────────────────────────────────────────────────
 static bool connectWifi(const char* ssid, const char* pass,
@@ -98,139 +100,136 @@ static bool connectWifi(const char* ssid, const char* pass,
     return false;
 }
 
-// ── Button helpers ────────────────────────────────────────────────────────────
-static bool isButtonShortPress(uint8_t pin, uint16_t debounceMs) {
-    bool down = digitalRead(pin) == LOW;
-    unsigned long now = millis();
-
-    if (down && !buttonWasPressed) {
-        buttonWasPressed = true;
-        buttonPressedAt  = now;
-        return false;  // still pressing
-    }
-    if (!down && buttonWasPressed) {
-        buttonWasPressed = false;
-        uint32_t held = now - buttonPressedAt;
-        if (held >= debounceMs && held < 3000) return true;  // short press
-    }
-    return false;
-}
-
-static bool isButtonLongPress(uint8_t pin, uint16_t longPressMs) {
-    if (!buttonWasPressed) return false;
-    return (millis() - buttonPressedAt) >= longPressMs;
-}
-
-// ── State handlers ────────────────────────────────────────────────────────────
-
+// ── Iris enrollment handler (only when cameraEnabled = true) ──────────────────
 static void handleEnrolling(const DeviceConfig& c) {
     Serial.printf("[ENROLL] Starting enrollment for user '%s' ('%s')\n",
                   pendingEnrollUserId, pendingEnrollName);
-    actuators->setLedPattern(LedPattern::BLINK_FAST);
+    lcd->showMessage("Enrolling...", pendingEnrollName);
 
     IrisCapture iris = camera->captureAverage(c.irisEnrollFrames, 200);
 
     if (!iris.valid) {
         Serial.println("[ENROLL] Capture failed — aborting");
-        actuators->setLedPattern(LedPattern::BLINK_SLOW);
+        lcd->showMessage("Enroll failed", "No capture");
         fsm.transition(DeviceState::MONITORING);
         enrollPending = false;
         return;
     }
 
     if (biometric->enroll(pendingEnrollUserId, pendingEnrollName, iris)) {
-        Serial.printf("[ENROLL] Success: %d template(s) for '%s'\n",
-                      biometric->user(0).templateCount, pendingEnrollUserId);
+        Serial.printf("[ENROLL] Success: '%s'\n", pendingEnrollUserId);
         firebase->pushEnrollment(pendingEnrollUserId, pendingEnrollName);
-        // 2-second solid LED = enrolled OK
-        actuators->setLedPattern(LedPattern::ON);
+        lcd->showMessage("Enrolled!", pendingEnrollName);
         delay(2000);
     } else {
         Serial.println("[ENROLL] Save failed");
+        lcd->showMessage("Enroll failed", "Save error");
+        delay(1500);
     }
 
-    actuators->setLedPattern(LedPattern::BLINK_SLOW);
     memset(pendingEnrollUserId, 0, sizeof(pendingEnrollUserId));
     memset(pendingEnrollName,   0, sizeof(pendingEnrollName));
     enrollPending = false;
     fsm.transition(DeviceState::MONITORING);
 }
 
-static void handleAuthenticating(const DeviceConfig& c) {
-    actuators->setLedPattern(LedPattern::BLINK_FAST);
+// ── Iris authentication handler (only when cameraEnabled = true) ──────────────
+static void handleIrisAuth(const DeviceConfig& c) {
+    lcd->showMessage("Scanning iris...", "");
 
     IrisCapture iris = camera->capture();
 
     if (!iris.valid) {
         Serial.println("[AUTH] Camera capture failed");
         fsm.transition(DeviceState::REJECTED);
+        lcd->showAuth(false, "No capture");
         return;
     }
 
     MatchResult result = biometric->match(iris, c.irisMatchThreshold);
-
-    // Get ambient environment as sign-in context
-    SensorReading env = sensors->readNow();
+    SensorReading env  = sensors->readNow();
 
     if (result.matched) {
         fsm.transition(DeviceState::AUTHENTICATED);
-        actuators->setRelay(RelayState::ON);     // unlock door
-        actuators->setLedPattern(LedPattern::ON);
-
-        // Anomaly scoring
         float anomScore = anomaly->record(result, true);
-
-        // Always log sign-in to Firebase
-        firebase->pushSignIn(result.userId, result.userName,
-                             result.score, true, anomScore);
-
-        // Always publish telemetry to AWS
-        if (awsIoT && awsIoT->isConnected()) {
+        firebase->pushSignIn(result.userId, result.userName, result.score, true, anomScore);
+        if (awsIoT && awsIoT->isConnected())
             awsIoT->publishBiometricEvent(result.userId, result.score, true);
-        }
-
-        // Raise alert if anomalous
         if (anomScore >= c.anomalyScoreThreshold) {
-            Serial.printf("[AUTH] Anomaly detected (score=%.3f) — alerting\n",
-                          anomScore);
-            const char* alertType =
-                anomaly->consecutiveFailures() >= BRUTE_FORCE_LIMIT
-                    ? "brute_force"
-                    : "suspicious_signin";
-            alertMgr->sendAnomaly(result.userId, anomScore, alertType);
-            // Transition to ALERT only after AUTHENTICATED display period ends
-            // (handled in main loop timeout check)
+            const char* t = anomaly->consecutiveFailures() >= 5 ? "brute_force" : "suspicious_signin";
+            alertMgr->sendAnomaly(result.userId, anomScore, t);
         }
-
+        lcd->showAuth(true, result.userName);
     } else {
         fsm.transition(DeviceState::REJECTED);
-        actuators->setLedPattern(LedPattern::BLINK_FAST);
-
         float anomScore = anomaly->record(result, false);
-
         firebase->pushSignIn(
             result.userId[0] ? result.userId : "unknown",
             result.userName[0] ? result.userName : "Unknown",
             result.score, false, anomScore);
-
-        if (awsIoT && awsIoT->isConnected()) {
+        if (awsIoT && awsIoT->isConnected())
             awsIoT->publishBiometricEvent(
-                result.userId[0] ? result.userId : "unknown",
-                result.score, false);
-        }
+                result.userId[0] ? result.userId : "unknown", result.score, false);
+        if (anomaly->bruteForceScore() >= c.anomalyScoreThreshold)
+            alertMgr->sendAnomaly("unknown", anomaly->bruteForceScore(), "brute_force");
+        lcd->showAuth(false, "No match");
+    }
+}
 
-        // Brute force check
-        float bfScore = anomaly->bruteForceScore();
-        if (bfScore >= c.anomalyScoreThreshold) {
-            alertMgr->sendAnomaly("unknown", bfScore, "brute_force",
-                                  "Repeated failed iris attempts");
-        }
+// ── PIN authentication handler (keypad, non-blocking) ─────────────────────────
+static void handlePinAuth(const DeviceConfig& c) {
+    // First entry — initialise
+    if (!pinWaiting) {
+        pinWaiting    = true;
+        pinAuthStartMs = millis();
+        pinLen        = 0;
+        memset(pinBuf, 0, sizeof(pinBuf));
+        lcd->showPinEntry("");
+        return;
     }
 
-    // Log environmental context alongside sign-in
-    if (env.valid && awsIoT && awsIoT->isConnected()) {
-        MLResult envMl = ml.infer(env.temperatureC, env.humidityPct, env.lightNorm);
-        awsIoT->publishReading(env, envMl, fsm.current());
+    // Timeout after 30 s
+    if (millis() - pinAuthStartMs > 30000) {
+        pinWaiting = false;
+        fsm.transition(DeviceState::REJECTED);
+        lcd->showAuth(false, "Timeout");
+        firebase->pushSignIn("pin_auth", "PIN Auth", 1.0f, false, 0.0f);
+        return;
+    }
+
+    char key = keypad->getKey();
+    if (key == '\0') return;
+
+    if (key == '*') {
+        // Clear
+        pinLen = 0;
+        memset(pinBuf, 0, sizeof(pinBuf));
+        lcd->showPinEntry("");
+    } else if (key == '#') {
+        // Submit
+        pinBuf[pinLen] = '\0';
+        bool correct   = (strcmp(pinBuf, c.accessPin) == 0);
+        pinWaiting     = false;
+
+        if (correct) {
+            fsm.transition(DeviceState::AUTHENTICATED);
+            lcd->showAuth(true, "PIN Accepted");
+            firebase->pushSignIn("pin_auth", "PIN Authenticated", 0.0f, true, 0.0f);
+            if (awsIoT && awsIoT->isConnected())
+                awsIoT->publishBiometricEvent("pin_auth", 0.0f, true);
+        } else {
+            fsm.transition(DeviceState::REJECTED);
+            lcd->showAuth(false, "Wrong PIN");
+            firebase->pushSignIn("pin_auth", "PIN Auth", 1.0f, false, 0.5f);
+            if (awsIoT && awsIoT->isConnected())
+                awsIoT->publishBiometricEvent("pin_auth", 1.0f, false);
+        }
+    } else if (pinLen < 7) {
+        pinBuf[pinLen++] = key;
+        char masked[8]   = {};
+        for (uint8_t i = 0; i < pinLen; i++) masked[i] = '*';
+        masked[pinLen] = '\0';
+        lcd->showPinEntry(masked);
     }
 }
 
@@ -243,51 +242,60 @@ void setup() {
     config.load();
     const DeviceConfig& c = config.cfg();
 
-    // Instantiate hardware modules
-    sensors   = new SensorManager(c.dhtPin, c.dhtType, c.ldrPin);
-    actuators = new ActuatorController(c.relayPin, c.ledPin);
-    firebase  = new FirebaseManager(c.firebaseApiKey, c.firebaseDatabaseUrl,
-                                     c.firebaseUserEmail, c.firebaseUserPassword,
-                                     c.deviceId);
-    camera    = new IrisCamera();  // AI Thinker default pins
-    biometric = new BiometricManager();
-    anomaly   = new AnomalyDetector(c.irisMatchThreshold);
+    // Instantiate modules
+    sensors  = new SensorManager(c.dhtPin, c.dhtType,
+                                  c.smokePin, c.ultrasonicTrig, c.ultrasonicEcho);
+    firebase = new FirebaseManager(c.firebaseApiKey, c.firebaseDatabaseUrl,
+                                    c.firebaseUserEmail, c.firebaseUserPassword,
+                                    c.deviceId);
+    lcd    = new LCDManager();
+    keypad = new KeypadManager();
 
-    // Button pin
-    pinMode(c.authButtonPin, INPUT_PULLUP);
+    lcd->begin();
+    lcd->showMessage("Booting...", c.deviceId);
 
     sensors->begin();
-    actuators->begin();
-    actuators->setLedPattern(LedPattern::BLINK_FAST);  // fast = booting
+    keypad->begin();
 
-    // ML (environmental — optional, used for env context alongside sign-ins)
+    // ML (env risk score — uses smokePct as 3rd input instead of lightNorm)
     if (!ml.begin()) {
         Serial.println("[BOOT] Env ML init failed — env inference disabled");
     }
 
-    // Camera
-    if (!camera->begin()) {
-        Serial.println("[BOOT] Camera init failed — HALTING");
-        fsm.transition(DeviceState::ERROR);
-        actuators->setLedPattern(LedPattern::BLINK_SOS);
-        while (true) { actuators->tick(); delay(10); }
+    // Camera + biometrics (skip when cameraEnabled = false)
+    if (c.cameraEnabled) {
+        camera    = new IrisCamera();
+        biometric = new BiometricManager();
+        if (!camera->begin()) {
+            Serial.println("[BOOT] Camera init failed — HALTING");
+            fsm.transition(DeviceState::ERROR);
+            lcd->showMessage("Camera FAIL", "Halting...");
+            while (true) delay(10);
+        }
+        biometric->begin();
+        anomaly = new AnomalyDetector(c.irisMatchThreshold);
+        Serial.printf("[BOOT] Camera OK — %d user(s) enrolled in SPIFFS\n",
+                      biometric->userCount());
+    } else {
+        Serial.println("[BOOT] Camera disabled — iris auth via web dashboard");
     }
 
-    // Biometric templates (from SPIFFS)
-    biometric->begin();
-
     fsm.transition(DeviceState::CONNECTING);
+    lcd->showMessage("Connecting...", "WiFi");
     bool wifiOk = connectWifi(c.wifiSsid, c.wifiPassword);
     bool fbOk   = false;
     if (wifiOk) {
+        lcd->showMessage("Firebase", "Connecting...");
         fbOk = firebase->begin();
     }
 
     if (!wifiOk || !fbOk) {
-        Serial.println("[BOOT] Offline mode — Firebase pushes will be queued");
+        Serial.println("[BOOT] Offline mode — readings will be queued");
+        lcd->showMessage("Offline mode", "Queue active");
+        delay(1000);
     }
 
-    // AWS IoT Core (optional — enabled by config)
+    // AWS IoT Core
     if (c.awsEnabled && wifiOk) {
         awsIoT = new AWSIoTManager(c.awsEndpoint, c.awsThingName,
                                    AWS_ROOT_CA, AWS_DEVICE_CERT, AWS_PRIVATE_KEY);
@@ -296,21 +304,23 @@ void setup() {
         }
     }
 
-    // AlertManager wired to AWS + Firebase
     alertMgr = new AlertManager(c.awsThingName[0] ? c.awsThingName : c.deviceId,
                                  awsIoT, firebase);
 
     fsm.transition(DeviceState::READY);
     fsm.transition(DeviceState::MONITORING);
-    actuators->setLedPattern(LedPattern::BLINK_SLOW);
 
-    Serial.printf("[BOOT] Device '%s' ready — %d user(s) enrolled\n",
-                  c.deviceId, biometric->userCount());
+    // Initial sensor read for LCD
+    lastEnvReading = sensors->readNow();
+
+    Serial.printf("[BOOT] Device '%s' ready\n", c.deviceId);
+    lcd->showMessage("Ready", c.deviceId);
+    delay(1000);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 void loop() {
-    const DeviceConfig& c = config.cfg();
+    const DeviceConfig& c    = config.cfg();
     DeviceState          state = fsm.current();
 
     // ── WiFi watchdog ─────────────────────────────────────────────────────────
@@ -318,12 +328,12 @@ void loop() {
         if (WiFi.status() != WL_CONNECTED) {
             Serial.println("[WiFi] Lost — reconnecting");
             fsm.transition(DeviceState::CONNECTING);
-            actuators->setLedPattern(LedPattern::BLINK_FAST);
-            bool reconnected = connectWifi(c.wifiSsid, c.wifiPassword, 20000);
-            if (reconnected) {
+            lcd->showMessage("WiFi lost...", "Reconnecting");
+            bool ok = connectWifi(c.wifiSsid, c.wifiPassword, 20000);
+            if (ok) {
                 firebase->flushQueue();
                 fsm.transition(DeviceState::MONITORING);
-                actuators->setLedPattern(LedPattern::BLINK_SLOW);
+                lcd->showMessage("WiFi OK", c.deviceId);
             }
             return;
         }
@@ -332,15 +342,11 @@ void loop() {
     // ── MQTT keep-alive ───────────────────────────────────────────────────────
     if (awsIoT) awsIoT->loop();
 
-    // ── Service LED and relay override expiry ─────────────────────────────────
-    actuators->tick();
-
     // ── Agent ACK handling ────────────────────────────────────────────────────
     if (awsIoT) {
         char ackUser[32], ackType[32];
-        if (awsIoT->getAgentAck(ackUser, ackType)) {
+        if (awsIoT->getAgentAck(ackUser, ackType))
             alertMgr->onAgentAck(ackUser, ackType);
-        }
     }
 
     // ── Heartbeat ─────────────────────────────────────────────────────────────
@@ -351,115 +357,99 @@ void loop() {
         if (awsIoT && awsIoT->isConnected()) awsIoT->publishHeartbeat(fsm.current());
     }
 
-    // ── Poll Firebase commands ────────────────────────────────────────────────
+    // ── Poll Firebase commands every 5 s ─────────────────────────────────────
     if (now - lastCommandMs >= 5000) {
         lastCommandMs = now;
 
-        // Relay override (legacy or remote unlock)
-        RelayState remoteRelay;
-        if (firebase->pollCommands(remoteRelay)) {
-            actuators->setRelayOverride(remoteRelay, 300000);
-        }
-
-        // Enrollment command from dashboard
-        if (!enrollPending &&
+        // Enrollment command from dashboard (only used when cameraEnabled = true)
+        if (!enrollPending && c.cameraEnabled)
             firebase->pollEnrollCommand(pendingEnrollUserId, sizeof(pendingEnrollUserId),
-                                         pendingEnrollName,   sizeof(pendingEnrollName))) {
-            enrollPending = true;
-        }
+                                         pendingEnrollName,   sizeof(pendingEnrollName));
+        if (pendingEnrollUserId[0]) enrollPending = true;
     }
 
-    // ── AWS relay command ─────────────────────────────────────────────────────
-    if (awsIoT) {
-        RelayState awsRelay;
-        if (awsIoT->getRelayCommand(awsRelay)) {
-            actuators->setRelayOverride(awsRelay, 300000);
-        }
-    }
-
-    // ── State machine ─────────────────────────────────────────────────────────
+    // ── Refresh state after polling ───────────────────────────────────────────
     state = fsm.current();
 
-    // ── MONITORING: wait for trigger ──────────────────────────────────────────
+    // ── MONITORING ────────────────────────────────────────────────────────────
     if (state == DeviceState::MONITORING) {
 
-        // Enrollment trigger: Firebase command takes priority
-        if (enrollPending) {
+        // Enrollment (iris path only)
+        if (enrollPending && c.cameraEnabled) {
             fsm.transition(DeviceState::ENROLLING);
             return;
         }
 
-        // Long press: enter enrollment mode (waits for Firebase command for user ID)
-        if (isButtonLongPress(c.authButtonPin, c.buttonLongPressMs) && !enrollPending) {
-            Serial.println("[BTN] Long press — waiting for Firebase enrollment command");
-            // LED pattern to signal awaiting enrollment command
-            actuators->setLedPattern(LedPattern::BLINK_FAST);
-            delay(500);
-            actuators->setLedPattern(LedPattern::BLINK_SLOW);
-            buttonWasPressed = false;  // reset so short-press can still work
-            return;
-        }
-
-        // Short press: authenticate
-        if (isButtonShortPress(c.authButtonPin, c.buttonDebounceMs)) {
-            Serial.println("[BTN] Short press — starting authentication");
+        // Any keypad press → start PIN auth
+        char key = keypad->getKey();
+        if (key != '\0') {
+            Serial.printf("[KPD] Key '%c' pressed — starting PIN auth\n", key);
             fsm.transition(DeviceState::AUTHENTICATING);
             return;
         }
+
+        // Cycle LCD through sensor readings
+        if (lastEnvReading.valid) {
+            lcd->tickSensorScreens(lastEnvReading);
+        }
     }
 
-    // ── ENROLLING ─────────────────────────────────────────────────────────────
+    // ── ENROLLING (iris) ──────────────────────────────────────────────────────
     if (state == DeviceState::ENROLLING) {
+        if (!c.cameraEnabled) { fsm.transition(DeviceState::MONITORING); return; }
         handleEnrolling(c);
         return;
     }
 
     // ── AUTHENTICATING ────────────────────────────────────────────────────────
     if (state == DeviceState::AUTHENTICATING) {
-        handleAuthenticating(c);
+        if (c.cameraEnabled) {
+            handleIrisAuth(c);
+        } else {
+            handlePinAuth(c);
+        }
         return;
     }
 
     // ── AUTHENTICATED / REJECTED: display timeout ─────────────────────────────
     if (state == DeviceState::AUTHENTICATED || state == DeviceState::REJECTED) {
         if (fsm.timeInState() >= c.authDisplayMs) {
-            actuators->setRelay(RelayState::OFF);   // re-lock
-            actuators->setLedPattern(LedPattern::BLINK_SLOW);
-
-            // If anomalous, transition to ALERT for an extended notification period
-            // (anomaly was already sent by handleAuthenticating; here we just track state)
-            // Simplified: if the last record had high anomaly score, go ALERT
-            // We check via AnomalyDetector — if consecutiveFailures is 0 and we had
-            // a suspicious_signin, a record was already pushed; just go back to MONITORING
             fsm.transition(DeviceState::MONITORING);
         }
         return;
     }
 
-    // ── ALERT: anomaly display period ────────────────────────────────────────
+    // ── ALERT: environmental anomaly ─────────────────────────────────────────
     if (state == DeviceState::ALERT) {
-        if (fsm.timeInState() >= 10000) {   // 10 s visual alert
-            actuators->setLedPattern(LedPattern::BLINK_SLOW);
+        if (fsm.timeInState() >= 10000) {
             fsm.transition(DeviceState::MONITORING);
         }
         return;
     }
 
-    // ── ERROR: restart after 10 s ────────────────────────────────────────────
+    // ── ERROR: restart ────────────────────────────────────────────────────────
     if (state == DeviceState::ERROR && fsm.timeInState() > 10000) {
         Serial.println("[MAIN] Rebooting after ERROR timeout");
         ESP.restart();
     }
 
-    // ── Background: ambient env sensor (every sensorIntervalMs) ──────────────
+    // ── Background: ambient sensor read every sensorIntervalMs ───────────────
     if (now - lastEnvSensorMs >= c.sensorIntervalMs &&
         state == DeviceState::MONITORING) {
         lastEnvSensorMs = now;
         SensorReading env = sensors->readNow();
-        if (env.valid && awsIoT && awsIoT->isConnected()) {
-            MLResult envMl = ml.infer(env.temperatureC, env.humidityPct, env.lightNorm);
-            awsIoT->publishReading(env, envMl, fsm.current());
+        if (env.valid) {
+            lastEnvReading = env;
+            // Pass smokePct (0–1) as 3rd input to the env ML model
+            MLResult envMl = ml.infer(env.temperatureC, env.humidityPct,
+                                       env.smokePct / 100.0f);
             firebase->pushReading(env, envMl, fsm.current());
+            if (awsIoT && awsIoT->isConnected())
+                awsIoT->publishReading(env, envMl, fsm.current());
+
+            // Env risk alert
+            if (envMl.riskScore >= c.mlRiskThreshold)
+                fsm.transition(DeviceState::ALERT);
         }
     }
 

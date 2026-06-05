@@ -39,12 +39,12 @@ void ConfigManager::_applyDefaults() {
     strlcpy(_cfg.firebaseUserEmail,   "",                    sizeof(_cfg.firebaseUserEmail));
     strlcpy(_cfg.firebaseUserPassword,"",                    sizeof(_cfg.firebaseUserPassword));
 
-    // Pins (change to match your wiring)
-    _cfg.dhtPin   = 4;
-    _cfg.ldrPin   = 34;
-    _cfg.relayPin = 26;
-    _cfg.ledPin   = 2;
-    _cfg.dhtType  = 22;  // DHT22
+    // Sensor pins
+    _cfg.dhtPin          = 4;
+    _cfg.dhtType         = 11;   // DHT11
+    _cfg.smokePin        = 32;   // MQ-2 analog out
+    _cfg.ultrasonicTrig  = 5;    // HC-SR04 TRIG
+    _cfg.ultrasonicEcho  = 18;   // HC-SR04 ECHO
 
     // Timing
     _cfg.sensorIntervalMs    = 5000;    // 5 s
@@ -65,14 +65,14 @@ void ConfigManager::_applyDefaults() {
     strlcpy(_cfg.awsThingName, "", sizeof(_cfg.awsThingName));
     _cfg.awsEnabled = false;
 
-    // Biometric / Iris
-    _cfg.authButtonPin      = 15;     // GPIO 15 — short press → authenticate
-    _cfg.enrollButtonPin    = 15;     // same pin, long press → enter enroll mode
-    _cfg.buttonDebounceMs   = 50;
-    _cfg.buttonLongPressMs  = 3000;   // 3 s hold → enrollment mode
-    _cfg.irisMatchThreshold = 0.30f;  // L2 distance threshold
-    _cfg.irisEnrollFrames   = 5;      // frames to average during enrollment
-    _cfg.authDisplayMs      = 3000;   // 3 s display of AUTHENTICATED/REJECTED
+    // Biometric / Iris (only relevant when cameraEnabled = true)
+    _cfg.cameraEnabled      = false;
+    _cfg.irisMatchThreshold = 0.30f;
+    _cfg.irisEnrollFrames   = 5;
+    _cfg.authDisplayMs      = 3000;
+
+    // Keypad PIN
+    strlcpy(_cfg.accessPin, "1234", sizeof(_cfg.accessPin));
 
     // Anomaly detection
     _cfg.anomalyScoreThreshold = 0.60f;
@@ -127,11 +127,11 @@ bool ConfigManager::_parseJson(const String& json) {
     if (doc.containsKey("firebaseEmail"))  strlcpy(_cfg.firebaseUserEmail, doc["firebaseEmail"], sizeof(_cfg.firebaseUserEmail));
     if (doc.containsKey("firebasePass"))   strlcpy(_cfg.firebaseUserPassword, doc["firebasePass"], sizeof(_cfg.firebaseUserPassword));
 
-    if (doc.containsKey("dhtPin"))   _cfg.dhtPin   = doc["dhtPin"];
-    if (doc.containsKey("ldrPin"))   _cfg.ldrPin   = doc["ldrPin"];
-    if (doc.containsKey("relayPin")) _cfg.relayPin = doc["relayPin"];
-    if (doc.containsKey("ledPin"))   _cfg.ledPin   = doc["ledPin"];
-    if (doc.containsKey("dhtType"))  _cfg.dhtType  = doc["dhtType"];
+    if (doc.containsKey("dhtPin"))          _cfg.dhtPin         = doc["dhtPin"];
+    if (doc.containsKey("dhtType"))         _cfg.dhtType        = doc["dhtType"];
+    if (doc.containsKey("smokePin"))        _cfg.smokePin       = doc["smokePin"];
+    if (doc.containsKey("ultrasonicTrig"))  _cfg.ultrasonicTrig = doc["ultrasonicTrig"];
+    if (doc.containsKey("ultrasonicEcho"))  _cfg.ultrasonicEcho = doc["ultrasonicEcho"];
 
     if (doc.containsKey("sensorIntervalMs"))    _cfg.sensorIntervalMs    = doc["sensorIntervalMs"];
     if (doc.containsKey("firebaseSyncMs"))      _cfg.firebaseSyncMs      = doc["firebaseSyncMs"];
@@ -148,13 +148,14 @@ bool ConfigManager::_parseJson(const String& json) {
     if (doc.containsKey("awsEnabled"))   _cfg.awsEnabled = doc["awsEnabled"];
 
     // Biometric
-    if (doc.containsKey("authButtonPin"))      _cfg.authButtonPin      = doc["authButtonPin"];
-    if (doc.containsKey("enrollButtonPin"))    _cfg.enrollButtonPin    = doc["enrollButtonPin"];
-    if (doc.containsKey("buttonDebounceMs"))   _cfg.buttonDebounceMs   = doc["buttonDebounceMs"];
-    if (doc.containsKey("buttonLongPressMs"))  _cfg.buttonLongPressMs  = doc["buttonLongPressMs"];
+    if (doc.containsKey("cameraEnabled"))      _cfg.cameraEnabled      = doc["cameraEnabled"];
     if (doc.containsKey("irisMatchThreshold")) _cfg.irisMatchThreshold = doc["irisMatchThreshold"];
     if (doc.containsKey("irisEnrollFrames"))   _cfg.irisEnrollFrames   = doc["irisEnrollFrames"];
     if (doc.containsKey("authDisplayMs"))      _cfg.authDisplayMs      = doc["authDisplayMs"];
+
+    // Keypad PIN
+    if (doc.containsKey("accessPin"))
+        strlcpy(_cfg.accessPin, doc["accessPin"] | "1234", sizeof(_cfg.accessPin));
 
     // Anomaly
     if (doc.containsKey("anomalyScoreThreshold")) _cfg.anomalyScoreThreshold = doc["anomalyScoreThreshold"];
@@ -176,10 +177,10 @@ bool ConfigManager::save() const {
     doc["firebaseEmail"]     = _cfg.firebaseUserEmail;
     doc["firebasePass"]      = _cfg.firebaseUserPassword;
     doc["dhtPin"]            = _cfg.dhtPin;
-    doc["ldrPin"]            = _cfg.ldrPin;
-    doc["relayPin"]          = _cfg.relayPin;
-    doc["ledPin"]            = _cfg.ledPin;
     doc["dhtType"]           = _cfg.dhtType;
+    doc["smokePin"]          = _cfg.smokePin;
+    doc["ultrasonicTrig"]    = _cfg.ultrasonicTrig;
+    doc["ultrasonicEcho"]    = _cfg.ultrasonicEcho;
     doc["sensorIntervalMs"]  = _cfg.sensorIntervalMs;
     doc["firebaseSyncMs"]    = _cfg.firebaseSyncMs;
     doc["heartbeatIntervalMs"] = _cfg.heartbeatIntervalMs;
@@ -192,15 +193,13 @@ bool ConfigManager::save() const {
     doc["awsThingName"]      = _cfg.awsThingName;
     doc["awsEnabled"]        = _cfg.awsEnabled;
 
-    doc["authButtonPin"]         = _cfg.authButtonPin;
-    doc["enrollButtonPin"]       = _cfg.enrollButtonPin;
-    doc["buttonDebounceMs"]      = _cfg.buttonDebounceMs;
-    doc["buttonLongPressMs"]     = _cfg.buttonLongPressMs;
+    doc["cameraEnabled"]         = _cfg.cameraEnabled;
     doc["irisMatchThreshold"]    = _cfg.irisMatchThreshold;
     doc["irisEnrollFrames"]      = _cfg.irisEnrollFrames;
     doc["authDisplayMs"]         = _cfg.authDisplayMs;
     doc["anomalyScoreThreshold"] = _cfg.anomalyScoreThreshold;
     doc["alertCooldownMs"]       = _cfg.alertCooldownMs;
+    doc["accessPin"]             = _cfg.accessPin;
 
     File f = SPIFFS.open("/config.json", "w");
     if (!f) return false;

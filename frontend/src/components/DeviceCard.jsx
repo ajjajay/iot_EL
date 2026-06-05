@@ -8,8 +8,8 @@ export default function DeviceCard({ id, device, lastSignin }) {
 
   const dotClass = `device-dot ${device.online ? (isAlert ? 'alert' : 'online') : 'offline'}`;
 
-  const rs       = latest.riskScore ?? 0;
-  const riskClass = rs >= 0.6 ? 'text-risk-crit' : rs >= 0.3 ? 'text-risk-warn' : 'text-risk-safe';
+  const smoke     = latest.smokePct ?? 0;
+  const smokeClass = smoke >= 50 ? 'text-risk-crit' : smoke >= 25 ? 'text-risk-warn' : 'text-risk-safe';
 
   return (
     <div className={`device-card${isAlert ? ' alert-active' : ''}`} data-device-id={id}>
@@ -59,17 +59,19 @@ export default function DeviceCard({ id, device, lastSignin }) {
           </div>
         </div>
         <div className="sensor-item">
-          <div className="sensor-icon">☀</div>
-          <div className="sensor-label">Light</div>
-          <div className="sensor-value light-value">
-            {latest.lightNorm != null ? `${(latest.lightNorm * 100).toFixed(0)}%` : '—'}
+          <div className="sensor-icon">💨</div>
+          <div className="sensor-label">Smoke</div>
+          <div className={`sensor-value smoke-value ${smokeClass}`}>
+            {latest.smokePct != null ? `${latest.smokePct.toFixed(1)}%` : '—'}
           </div>
         </div>
         <div className="sensor-item">
-          <div className="sensor-icon">🧠</div>
-          <div className="sensor-label">Env Risk</div>
-          <div className={`sensor-value risk-value ${riskClass}`}>
-            {`${(rs * 100).toFixed(0)}%`}
+          <div className="sensor-icon">📏</div>
+          <div className="sensor-label">Distance</div>
+          <div className="sensor-value dist-value">
+            {latest.distanceCm != null
+              ? (latest.distanceCm < 0 ? 'N/A' : `${latest.distanceCm.toFixed(1)} cm`)
+              : '—'}
           </div>
         </div>
       </div>

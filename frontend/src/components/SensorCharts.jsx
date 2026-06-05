@@ -26,8 +26,8 @@ function buildChartOptions() {
 const CHART_DEFS = [
   { field: 'temperatureC', title: 'Temperature (°C)', badgeClass: 'temp-badge',  fmt: v => `${v.toFixed(1)}°C`      },
   { field: 'humidityPct',  title: 'Humidity (%)',     badgeClass: 'hum-badge',   fmt: v => `${v.toFixed(1)}%`       },
-  { field: 'lightNorm',    title: 'Light Level',      badgeClass: 'light-badge', fmt: v => `${(v*100).toFixed(0)}%` },
-  { field: 'riskScore',    title: 'Env. Risk Score',  badgeClass: 'risk-badge',  fmt: v => `${(v*100).toFixed(0)}%`, isRisk: true },
+  { field: 'smokePct',     title: 'Smoke Level (%)',  badgeClass: 'smoke-badge', fmt: v => `${v.toFixed(1)}%`       },
+  { field: 'distanceCm',   title: 'Distance (cm)',    badgeClass: 'dist-badge',  fmt: v => v < 0 ? 'N/A' : `${v.toFixed(1)} cm` },
 ];
 
 export default function SensorCharts({ readings, devices }) {

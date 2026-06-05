@@ -74,8 +74,9 @@ bool FirebaseManager::_pushOne(const SensorReading& s, const MLResult& ml,
     FirebaseJson data;
     data.set("temperatureC",  s.temperatureC);
     data.set("humidityPct",   s.humidityPct);
-    data.set("lightRaw",      s.lightRaw);
-    data.set("lightNorm",     s.lightNorm);
+    data.set("smokeRaw",      s.smokeRaw);
+    data.set("smokePct",      s.smokePct);
+    data.set("distanceCm",    s.distanceCm);
     data.set("riskScore",     ml.riskScore);
     data.set("mlLabel",       ml.label);
     data.set("pNormal",       ml.pNormal);
@@ -99,8 +100,8 @@ bool FirebaseManager::_pushOne(const SensorReading& s, const MLResult& ml,
         // Not fatal — latest was already updated
     }
 
-    Serial.printf("[FB] Pushed: T=%.1f H=%.1f L=%d risk=%.3f\n",
-                  s.temperatureC, s.humidityPct, s.lightRaw, ml.riskScore);
+    Serial.printf("[FB] Pushed: T=%.1f H=%.1f smoke=%.1f%% dist=%.1fcm risk=%.3f\n",
+                  s.temperatureC, s.humidityPct, s.smokePct, s.distanceCm, ml.riskScore);
     return true;
 }
 
