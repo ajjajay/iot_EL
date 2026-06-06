@@ -1,4 +1,5 @@
 #include "LCDManager.h"
+#include <Wire.h>
 #include <stdio.h>
 
 LCDManager::LCDManager(uint8_t addr, uint8_t cols, uint8_t rows)
@@ -6,6 +7,7 @@ LCDManager::LCDManager(uint8_t addr, uint8_t cols, uint8_t rows)
       _screen(0), _lastSwitch(0) {}
 
 void LCDManager::begin() {
+    Wire.begin(21, 22);   // ESP32 needs explicit SDA/SCL before LCD driver
     _lcd.init();
     _lcd.backlight();
     _lcd.clear();
