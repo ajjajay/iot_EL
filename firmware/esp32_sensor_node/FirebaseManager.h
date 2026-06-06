@@ -13,6 +13,8 @@
 
 #include <Arduino.h>
 #include <Firebase_ESP_Client.h>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include "SensorManager.h"
 #include "MLInference.h"
 #include "StateManager.h"
@@ -32,7 +34,8 @@ class FirebaseManager {
 public:
     FirebaseManager(const char* apiKey, const char* databaseUrl,
                     const char* userEmail, const char* userPassword,
-                    const char* deviceId);
+                    const char* deviceId,
+                    const char* storageBucket = "");
 
     // Call once in setup()
     bool begin();
@@ -53,6 +56,10 @@ public:
 
     // Update device online/offline presence
     void setOnline(bool online);
+
+    // Upload a JPEG buffer to Firebase Storage; returns the remote path on success,
+    // empty string on failure. The path is included in MQTT payloads for Lambda to use.
+    String uploadJpegToStorage(const uint8_t* buf, size_t len, const String& remotePath);
 
     // ── Biometric logging ────────────────────────────────────────────────────
 
@@ -75,11 +82,13 @@ public:
     bool isConnected() const { return _connected; }
 
 private:
-    FirebaseData   _fbData;
+    FirebaseData   _fbData;      // writes: pushReading, sendHeartbeat, setOnline
+    FirebaseData   _fbDataRead;  // reads:  pollCommands, pollEnrollCommand
     FirebaseAuth   _fbAuth;
     FirebaseConfig _fbConfig;
 
     const char* _deviceId;
+    char        _storageBucket[80];
     bool        _connected;
     bool        _authenticated;
 

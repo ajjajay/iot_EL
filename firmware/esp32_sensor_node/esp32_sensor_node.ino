@@ -108,10 +108,22 @@ static void handleEnrolling(const DeviceConfig& c) {
                   pendingEnrollUserId, pendingEnrollName);
     lcd->showMessage("Enrolling...", pendingEnrollName);
 
+    // 1. Capture JPEG for Rekognition (single frame before feature averaging)
+    String storagePath = "";
+    JpegCapture jpeg = camera->captureJpeg();
+    if (jpeg.valid) {
+        String path = String("enrollments/") + c.deviceId + "/" + pendingEnrollUserId + ".jpg";
+        storagePath = firebase->uploadJpegToStorage(jpeg.buf, jpeg.len, path);
+        IrisCamera::freeJpeg(jpeg);
+    } else {
+        Serial.println("[ENROLL] JPEG capture failed — Rekognition indexing skipped");
+    }
+
+    // 2. Capture averaged iris features for local SPIFFS matching
     IrisCapture iris = camera->captureAverage(c.irisEnrollFrames, 200);
 
     if (!iris.valid) {
-        Serial.println("[ENROLL] Capture failed — aborting");
+        Serial.println("[ENROLL] Feature capture failed — aborting");
         lcd->showMessage("Enroll failed", "No capture");
         fsm.transition(DeviceState::MONITORING);
         enrollPending = false;
@@ -121,6 +133,13 @@ static void handleEnrolling(const DeviceConfig& c) {
     if (biometric->enroll(pendingEnrollUserId, pendingEnrollName, iris)) {
         Serial.printf("[ENROLL] Success: '%s'\n", pendingEnrollUserId);
         firebase->pushEnrollment(pendingEnrollUserId, pendingEnrollName);
+
+        // 3. Publish enrollment event → IoT Rule → Lambda → Rekognition IndexFaces
+        if (awsIoT && awsIoT->isConnected()) {
+            awsIoT->publishEnrollmentEvent(pendingEnrollUserId, pendingEnrollName,
+                                           storagePath.c_str());
+        }
+
         lcd->showMessage("Enrolled!", pendingEnrollName);
         delay(2000);
     } else {
@@ -139,6 +158,18 @@ static void handleEnrolling(const DeviceConfig& c) {
 static void handleIrisAuth(const DeviceConfig& c) {
     lcd->showMessage("Scanning iris...", "");
 
+    // 1. Capture JPEG for Rekognition (upload before local matching)
+    String storagePath = "";
+    JpegCapture jpeg = camera->captureJpeg();
+    if (jpeg.valid) {
+        String path = String("signins/") + c.deviceId + "/" + String(millis()) + ".jpg";
+        storagePath = firebase->uploadJpegToStorage(jpeg.buf, jpeg.len, path);
+        IrisCamera::freeJpeg(jpeg);
+    } else {
+        Serial.println("[AUTH] JPEG capture failed — Rekognition will be skipped by Lambda");
+    }
+
+    // 2. Capture features for local matching
     IrisCapture iris = camera->capture();
 
     if (!iris.valid) {
@@ -149,14 +180,15 @@ static void handleIrisAuth(const DeviceConfig& c) {
     }
 
     MatchResult result = biometric->match(iris, c.irisMatchThreshold);
-    SensorReading env  = sensors->readNow();
 
     if (result.matched) {
         fsm.transition(DeviceState::AUTHENTICATED);
         float anomScore = anomaly->record(result, true);
         firebase->pushSignIn(result.userId, result.userName, result.score, true, anomScore);
+        // Publish to AWS — Lambda runs Rekognition, anomaly check, logs, SNS if needed
         if (awsIoT && awsIoT->isConnected())
-            awsIoT->publishBiometricEvent(result.userId, result.score, true);
+            awsIoT->publishBiometricEvent(result.userId, result.score, true,
+                                          storagePath.c_str());
         if (anomScore >= c.anomalyScoreThreshold) {
             const char* t = anomaly->consecutiveFailures() >= 5 ? "brute_force" : "suspicious_signin";
             alertMgr->sendAnomaly(result.userId, anomScore, t);
@@ -165,13 +197,12 @@ static void handleIrisAuth(const DeviceConfig& c) {
     } else {
         fsm.transition(DeviceState::REJECTED);
         float anomScore = anomaly->record(result, false);
-        firebase->pushSignIn(
-            result.userId[0] ? result.userId : "unknown",
-            result.userName[0] ? result.userName : "Unknown",
-            result.score, false, anomScore);
+        const char* uid  = result.userId[0]   ? result.userId   : "unknown";
+        const char* unam = result.userName[0] ? result.userName : "Unknown";
+        firebase->pushSignIn(uid, unam, result.score, false, anomScore);
+        // Even on local rejection, publish to Lambda — Rekognition may still identify them
         if (awsIoT && awsIoT->isConnected())
-            awsIoT->publishBiometricEvent(
-                result.userId[0] ? result.userId : "unknown", result.score, false);
+            awsIoT->publishBiometricEvent(uid, result.score, false, storagePath.c_str());
         if (anomaly->bruteForceScore() >= c.anomalyScoreThreshold)
             alertMgr->sendAnomaly("unknown", anomaly->bruteForceScore(), "brute_force");
         lcd->showAuth(false, "No match");
@@ -249,7 +280,7 @@ void setup() {
                                   c.smokePin, c.ultrasonicTrig, c.ultrasonicEcho);
     firebase = new FirebaseManager(c.firebaseApiKey, c.firebaseDatabaseUrl,
                                     c.firebaseUserEmail, c.firebaseUserPassword,
-                                    c.deviceId);
+                                    c.deviceId, c.firebaseStorageBucket);
     lcd    = new LCDManager();
     keypad = new KeypadManager();
 
@@ -361,6 +392,9 @@ void loop() {
             return;
         }
     }
+
+    // ── Firebase token refresh — must be called every loop iteration ─────────
+    Firebase.ready();
 
     // ── MQTT keep-alive ───────────────────────────────────────────────────────
     if (awsIoT) awsIoT->loop();

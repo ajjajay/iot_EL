@@ -30,6 +30,14 @@ struct IrisCapture {
     uint32_t timestampMs;
 };
 
+// Raw JPEG frame for upload to Firebase Storage → AWS Rekognition.
+// Call freeJpeg() when done — buf is heap-allocated by captureJpeg().
+struct JpegCapture {
+    uint8_t* buf;
+    size_t   len;
+    bool     valid;
+};
+
 class IrisCamera {
 public:
     // Default pin mapping: AI Thinker ESP32-CAM
@@ -49,6 +57,11 @@ public:
     // Average numFrames captures for a more stable enrollment template;
     // yields every delayMs to keep MQTT/RTOS tasks alive
     IrisCapture captureAverage(uint8_t numFrames = 5, uint32_t delayMs = 200);
+
+    // Capture one JPEG frame (switches sensor to JPEG mode, grabs, switches back).
+    // Returns heap-allocated buf — caller MUST call freeJpeg() when done.
+    JpegCapture captureJpeg();
+    static void freeJpeg(JpegCapture& jpeg);
 
     bool isReady() const { return _ready; }
 

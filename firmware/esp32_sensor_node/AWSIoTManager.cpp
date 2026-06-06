@@ -55,6 +55,9 @@ bool AWSIoTManager::_reconnect() {
     _mqtt.subscribe(aiAlerts.c_str());
 
     Serial.printf("[AWS] Subscribed to commands, shadow/delta, ai/alerts\n");
+
+    // Also publish to register enrollment topic with IoT Core
+    // (subscription not needed — Lambda publishes ACK on ai/alerts)
     return true;
 }
 
@@ -142,25 +145,51 @@ bool AWSIoTManager::isConnected() const {
 // ── Biometric methods ─────────────────────────────────────────────────────────
 
 void AWSIoTManager::publishBiometricEvent(const char* userId,
-                                           float matchScore, bool success) {
+                                           float matchScore, bool success,
+                                           const char* storagePath) {
     if (!_mqtt.connected()) return;
 
-    StaticJsonDocument<256> doc;
-    doc["deviceId"]  = _thingName;
-    doc["userId"]    = userId;
-    doc["matchScore"] = matchScore;
-    doc["success"]   = success;
-    doc["ts"]        = (uint32_t)(millis() / 1000);
+    StaticJsonDocument<384> doc;
+    doc["deviceId"]    = _thingName;
+    doc["userId"]      = userId;
+    doc["matchScore"]  = matchScore;
+    doc["success"]     = success;
+    doc["storagePath"] = storagePath ? storagePath : "";
+    doc["ts"]          = (double)time(nullptr) * 1000.0;
 
-    char buf[256];
+    char buf[384];
     size_t len = serializeJson(doc, buf);
 
     String topic = String("iot/") + _thingName + "/biometric/signin";
     if (!_mqtt.publish(topic.c_str(), buf, len)) {
         Serial.println("[AWS] Biometric event publish failed");
     } else {
-        Serial.printf("[AWS] Biometric event: user=%s success=%s score=%.3f\n",
-                      userId, success ? "Y" : "N", matchScore);
+        Serial.printf("[AWS] Biometric event: user=%s success=%s score=%.3f path=%s\n",
+                      userId, success ? "Y" : "N", matchScore,
+                      storagePath ? storagePath : "none");
+    }
+}
+
+void AWSIoTManager::publishEnrollmentEvent(const char* userId, const char* name,
+                                            const char* storagePath) {
+    if (!_mqtt.connected()) return;
+
+    StaticJsonDocument<384> doc;
+    doc["deviceId"]    = _thingName;
+    doc["userId"]      = userId;
+    doc["name"]        = name;
+    doc["storagePath"] = storagePath ? storagePath : "";
+    doc["ts"]          = (double)time(nullptr) * 1000.0;
+
+    char buf[384];
+    size_t len = serializeJson(doc, buf);
+
+    String topic = String("iot/") + _thingName + "/biometric/enroll";
+    if (!_mqtt.publish(topic.c_str(), buf, len)) {
+        Serial.println("[AWS] Enrollment event publish failed");
+    } else {
+        Serial.printf("[AWS] Enrollment event: user=%s name=%s path=%s\n",
+                      userId, name, storagePath ? storagePath : "none");
     }
 }
 

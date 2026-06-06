@@ -26,6 +26,7 @@ struct DeviceConfig {
     char firebaseDatabaseUrl[128];
     char firebaseUserEmail[64];
     char firebaseUserPassword[64];
+    char firebaseStorageBucket[80];  // e.g. iot-fc8b3.firebasestorage.app
 
     // AWS IoT Core
     char awsEndpoint[128];  // e.g. xxxxxx-ats.iot.us-east-1.amazonaws.com

@@ -36,8 +36,9 @@ void ConfigManager::_applyDefaults() {
     // Firebase
     strlcpy(_cfg.firebaseApiKey,      DEFAULT_FIREBASE_KEY, sizeof(_cfg.firebaseApiKey));
     strlcpy(_cfg.firebaseDatabaseUrl, DEFAULT_FIREBASE_URL, sizeof(_cfg.firebaseDatabaseUrl));
-    strlcpy(_cfg.firebaseUserEmail,   "",                    sizeof(_cfg.firebaseUserEmail));
-    strlcpy(_cfg.firebaseUserPassword,"",                    sizeof(_cfg.firebaseUserPassword));
+    strlcpy(_cfg.firebaseUserEmail,      "",                              sizeof(_cfg.firebaseUserEmail));
+    strlcpy(_cfg.firebaseUserPassword,   "",                              sizeof(_cfg.firebaseUserPassword));
+    strlcpy(_cfg.firebaseStorageBucket,  "iot-fc8b3.firebasestorage.app", sizeof(_cfg.firebaseStorageBucket));
 
     // Sensor pins
     _cfg.dhtPin          = 4;
@@ -125,7 +126,8 @@ bool ConfigManager::_parseJson(const String& json) {
     if (doc.containsKey("firebaseApiKey")) strlcpy(_cfg.firebaseApiKey, doc["firebaseApiKey"], sizeof(_cfg.firebaseApiKey));
     if (doc.containsKey("firebaseUrl"))    strlcpy(_cfg.firebaseDatabaseUrl, doc["firebaseUrl"], sizeof(_cfg.firebaseDatabaseUrl));
     if (doc.containsKey("firebaseEmail"))  strlcpy(_cfg.firebaseUserEmail, doc["firebaseEmail"], sizeof(_cfg.firebaseUserEmail));
-    if (doc.containsKey("firebasePass"))   strlcpy(_cfg.firebaseUserPassword, doc["firebasePass"], sizeof(_cfg.firebaseUserPassword));
+    if (doc.containsKey("firebasePass"))          strlcpy(_cfg.firebaseUserPassword,  doc["firebasePass"],          sizeof(_cfg.firebaseUserPassword));
+    if (doc.containsKey("firebaseStorageBucket")) strlcpy(_cfg.firebaseStorageBucket, doc["firebaseStorageBucket"], sizeof(_cfg.firebaseStorageBucket));
 
     if (doc.containsKey("dhtPin"))          _cfg.dhtPin         = doc["dhtPin"];
     if (doc.containsKey("dhtType"))         _cfg.dhtType        = doc["dhtType"];

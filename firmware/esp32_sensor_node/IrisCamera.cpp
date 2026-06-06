@@ -117,6 +117,43 @@ IrisCapture IrisCamera::captureAverage(uint8_t numFrames, uint32_t delayMs) {
     return avg;
 }
 
+JpegCapture IrisCamera::captureJpeg() {
+    JpegCapture result = { nullptr, 0, false };
+    if (!_ready) return result;
+
+    sensor_t* s = esp_camera_sensor_get();
+    if (!s) return result;
+
+    // Switch to JPEG for this capture, then restore grayscale
+    s->set_pixformat(s, PIXFORMAT_JPEG);
+    s->set_framesize(s, FRAMESIZE_QVGA);
+    delay(120);  // sensor needs ~2 frames to settle after format change
+
+    camera_fb_t* fb = esp_camera_fb_get();
+    if (fb && fb->format == PIXFORMAT_JPEG && fb->len > 0) {
+        result.buf = (uint8_t*)malloc(fb->len);
+        if (result.buf) {
+            memcpy(result.buf, fb->buf, fb->len);
+            result.len   = fb->len;
+            result.valid = true;
+            Serial.printf("[CAM] JPEG captured: %u bytes\n", fb->len);
+        }
+    }
+    if (fb) esp_camera_fb_return(fb);
+
+    // Restore grayscale for subsequent iris feature captures
+    s->set_pixformat(s, PIXFORMAT_GRAYSCALE);
+    delay(60);
+
+    return result;
+}
+
+void IrisCamera::freeJpeg(JpegCapture& jpeg) {
+    if (jpeg.buf) { free(jpeg.buf); jpeg.buf = nullptr; }
+    jpeg.len   = 0;
+    jpeg.valid = false;
+}
+
 // 8×8 zonal mean-intensity descriptor, normalised to [0, 1]
 void IrisCamera::_extractFeatures(const uint8_t* gray, uint16_t w, uint16_t h,
                                    float* out) const {

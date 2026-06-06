@@ -3,11 +3,12 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { ref, set, push, remove } from 'firebase/database';
 import { db, auth, DASH_EMAIL, DASH_PASSWORD } from './firebase.js';
-import { useDevices }  from './hooks/useDevices.js';
-import { useReadings } from './hooks/useReadings.js';
-import { useSignins }  from './hooks/useSignins.js';
-import { useUsers }    from './hooks/useUsers.js';
-import { useAlerts }   from './hooks/useAlerts.js';
+import { useDevices }       from './hooks/useDevices.js';
+import { useReadings }      from './hooks/useReadings.js';
+import { useSignins }       from './hooks/useSignins.js';
+import { useUsers }         from './hooks/useUsers.js';
+import { useAlerts }        from './hooks/useAlerts.js';
+import { useBackendStream } from './hooks/useBackendStream.js';
 import { makeDemoState, simulateDemoTick } from './utils/demo.js';
 import { useToast }    from './components/ToastContainer.jsx';
 
@@ -102,8 +103,21 @@ function AppInner() {
   const liveUsers    = useUsers(liveDb);
   const [liveAlerts, clearLiveAlerts] = useAlerts(liveDb);
 
-  const devices  = isDemo ? (demoState?.devices  ?? {}) : liveDevices;
-  const readings = isDemo ? (demoState?.readings ?? {}) : liveReadings;
+  // Backend SSE stream — runs in parallel; fills in data when Firebase SDK
+  // has no entries yet (e.g. auth delay) or as a cross-check.
+  const { devices: streamDevices, readings: streamReadings } = useBackendStream();
+
+  // Merge: Firebase SDK (real-time WebSocket) wins per-device when present;
+  // backend SSE fills in any device the SDK hasn't seen yet.
+  const mergedLiveDevices = { ...streamDevices, ...liveDevices };
+  const mergedLiveReadings = (() => {
+    const out = { ...streamReadings };
+    Object.entries(liveReadings).forEach(([id, arr]) => { out[id] = arr; });
+    return out;
+  })();
+
+  const devices  = isDemo ? (demoState?.devices  ?? {}) : mergedLiveDevices;
+  const readings = isDemo ? (demoState?.readings ?? {}) : mergedLiveReadings;
   const signins  = isDemo ? (demoState?.signins  ?? {}) : liveSignins;
   const users    = isDemo ? (demoState?.users    ?? {}) : liveUsers;
   const alerts   = isDemo ? (demoState?.alerts   ?? []) : liveAlerts;

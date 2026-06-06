@@ -53,8 +53,14 @@ public:
     // ── Biometric events ─────────────────────────────────────────────────────
 
     // Publish sign-in result to iot/{thingName}/biometric/signin
-    // AWS IoT Rule → Lambda → DynamoDB + anomaly ML pipeline
-    void publishBiometricEvent(const char* userId, float matchScore, bool success);
+    // storagePath is the Firebase Storage path to the captured JPEG (for Rekognition)
+    void publishBiometricEvent(const char* userId, float matchScore, bool success,
+                               const char* storagePath = "");
+
+    // Publish enrollment event to iot/{thingName}/biometric/enroll
+    // Lambda picks this up and indexes the face in Rekognition collection
+    void publishEnrollmentEvent(const char* userId, const char* name,
+                                const char* storagePath);
 
     // Publish anomaly alert JSON (pre-formatted by AlertManager) to
     // iot/{thingName}/biometric/alert → IoT Rule → Lambda → Bedrock Agent

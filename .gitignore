@@ -73,3 +73,11 @@ firebase-adminsdk*.json
 scripts/certs/
 frontend/.env
 scripts/.env
+
+# AWS IoT certificates — NEVER commit these (private key + device cert)
+aws_certificates.h
+**/aws_certificates.h
+
+# ESP32 SPIFFS config — contains WiFi + Firebase credentials
+data/config.json
+**/data/config.json

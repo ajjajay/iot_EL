@@ -4,7 +4,7 @@
 
 FirebaseManager::FirebaseManager(const char* apiKey, const char* databaseUrl,
                                   const char* userEmail, const char* userPassword,
-                                  const char* deviceId)
+                                  const char* deviceId, const char* storageBucket)
     : _deviceId(deviceId), _connected(false), _authenticated(false),
       _queueHead(0), _queueCount(0)
 {
@@ -13,6 +13,7 @@ FirebaseManager::FirebaseManager(const char* apiKey, const char* databaseUrl,
     _fbAuth.user.email         = userEmail;
     _fbAuth.user.password      = userPassword;
 
+    strlcpy(_storageBucket, storageBucket ? storageBucket : "", sizeof(_storageBucket));
     memset(_queue, 0, sizeof(_queue));
 }
 
@@ -110,9 +111,9 @@ bool FirebaseManager::pollCommands(RelayState& outRelay) {
     if (!_connected || !Firebase.ready()) return false;
 
     String path = _devicePath() + "/commands/relayOverride";
-    if (!Firebase.RTDB.getString(&_fbData, path.c_str())) return false;
+    if (!Firebase.RTDB.getString(&_fbDataRead, path.c_str())) return false;
 
-    String val = _fbData.stringData();
+    String val = _fbDataRead.stringData();
     if (val == "ON")  { outRelay = RelayState::ON;  return true; }
     if (val == "OFF") { outRelay = RelayState::OFF; return true; }
     return false;
@@ -184,7 +185,7 @@ void FirebaseManager::pushSignIn(const char* userId, const char* userName,
     data.set("matchScore",  matchScore);
     data.set("success",     success);
     data.set("anomalyScore", anomalyScore);
-    data.set("ts",          (uint32_t)time(nullptr));
+    data.set("ts",          (double)time(nullptr) * 1000.0);
 
     String path = String("/signins/") + _deviceId;
     Firebase.RTDB.push(&_fbData, path.c_str(), &data);
@@ -200,7 +201,7 @@ void FirebaseManager::pushEnrollment(const char* userId, const char* name) {
     data.set("userId",      userId);
     data.set("name",        name);
     data.set("deviceId",    _deviceId);
-    data.set("enrolledAt",  (uint32_t)time(nullptr));
+    data.set("enrolledAt",  (double)time(nullptr) * 1000.0);
 
     String path = String("/users/") + userId;
     Firebase.RTDB.updateNode(&_fbData, path.c_str(), &data);
@@ -219,7 +220,7 @@ void FirebaseManager::pushBiometricAlert(const char* userId,
     data.set("alertType",   alertType);
     data.set("anomalyScore", anomalyScore);
     data.set("acknowledged", false);
-    data.set("ts",          (uint32_t)time(nullptr));
+    data.set("ts",          (double)time(nullptr) * 1000.0);
 
     String path = String("/alerts/") + _deviceId;
     Firebase.RTDB.push(&_fbData, path.c_str(), &data);
@@ -233,27 +234,63 @@ bool FirebaseManager::pollEnrollCommand(char* outUserId, uint8_t userIdLen,
     if (!_connected || !Firebase.ready()) return false;
 
     String pendingPath = _devicePath() + "/commands/enroll/pending";
-    if (!Firebase.RTDB.getBool(&_fbData, pendingPath.c_str())) return false;
-    if (!_fbData.boolData()) return false;
+    if (!Firebase.RTDB.getBool(&_fbDataRead, pendingPath.c_str())) return false;
+    if (!_fbDataRead.boolData()) return false;
 
     // Read userId
     String uidPath = _devicePath() + "/commands/enroll/userId";
-    if (!Firebase.RTDB.getString(&_fbData, uidPath.c_str())) return false;
-    strlcpy(outUserId, _fbData.stringData().c_str(), userIdLen);
+    if (!Firebase.RTDB.getString(&_fbDataRead, uidPath.c_str())) return false;
+    strlcpy(outUserId, _fbDataRead.stringData().c_str(), userIdLen);
 
     // Read name
     String namePath = _devicePath() + "/commands/enroll/name";
-    if (Firebase.RTDB.getString(&_fbData, namePath.c_str())) {
-        strlcpy(outName, _fbData.stringData().c_str(), nameLen);
+    if (Firebase.RTDB.getString(&_fbDataRead, namePath.c_str())) {
+        strlcpy(outName, _fbDataRead.stringData().c_str(), nameLen);
     } else {
         strlcpy(outName, outUserId, nameLen);  // fall back to userId as name
     }
 
-    // Clear the pending flag so it doesn't trigger again
+    // Clear the pending flag (write path — use _fbData)
     Firebase.RTDB.setBool(&_fbData, pendingPath.c_str(), false);
 
     Serial.printf("[FB] Enroll command: userId=%s name=%s\n", outUserId, outName);
     return true;
+}
+
+// ── Firebase Storage upload ───────────────────────────────────────────────────
+
+String FirebaseManager::uploadJpegToStorage(const uint8_t* buf, size_t len,
+                                             const String& remotePath) {
+    if (!_connected || !Firebase.ready() || _storageBucket[0] == '\0') return "";
+
+    // URL-encode the path: replace '/' with '%2F'
+    String encoded = remotePath;
+    encoded.replace("/", "%2F");
+
+    String url = String("https://firebasestorage.googleapis.com/v0/b/")
+                 + _storageBucket
+                 + "/o?uploadType=media&name=" + encoded;
+
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure();  // prototype — skip cert pinning
+
+    HTTPClient http;
+    http.begin(secureClient, url);
+    http.addHeader("Content-Type",   "image/jpeg");
+    http.addHeader("Authorization",  String("Bearer ") + Firebase.getToken());
+    http.addHeader("Content-Length", String(len));
+    http.setTimeout(15000);
+
+    int code = http.POST(const_cast<uint8_t*>(buf), len);
+    http.end();
+
+    if (code == 200 || code == 201) {
+        Serial.printf("[FB] Storage upload OK: %s (%u B)\n", remotePath.c_str(), len);
+        return remotePath;
+    }
+
+    Serial.printf("[FB] Storage upload failed: HTTP %d path=%s\n", code, remotePath.c_str());
+    return "";
 }
 
 // ── Path helpers ──────────────────────────────────────────────────────────────
