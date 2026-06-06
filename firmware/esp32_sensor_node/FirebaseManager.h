@@ -88,8 +88,9 @@ public:
     bool isConnected() const { return _connected; }
 
 private:
-    FirebaseData   _fbData;      // writes: pushReading, sendHeartbeat, setOnline
-    FirebaseData   _fbDataRead;  // reads:  pollCommands, pollEnrollCommand
+    FirebaseData   _fbData;        // writes: pushReading, sendHeartbeat, setOnline
+    FirebaseData   _fbDataRead;    // reads:  pollCommands, pollEnrollCommand
+    FirebaseData   _fbDataSignIn;  // reads:  pollLatestSignIn (isolated)
     FirebaseAuth   _fbAuth;
     FirebaseConfig _fbConfig;
 

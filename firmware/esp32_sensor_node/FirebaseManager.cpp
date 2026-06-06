@@ -307,17 +307,17 @@ bool FirebaseManager::pollLatestSignIn(double lastSeenTs, char* outName, uint8_t
 
     Serial.println("[FB] Polling latest sign-in...");
 
-    if (!Firebase.RTDB.getJSON(&_fbDataRead, path.c_str(), &q)) {
+    if (!Firebase.RTDB.getJSON(&_fbDataSignIn, path.c_str(), &q)) {
         Serial.printf("[FB] pollLatestSignIn failed: %s\n",
-                      _fbDataRead.errorReason().c_str());
+                      _fbDataSignIn.errorReason().c_str());
         return false;
     }
 
-    Serial.printf("[FB] Raw JSON: %s\n", _fbDataRead.jsonString().c_str());
+    Serial.printf("[FB] Raw JSON: %s\n", _fbDataSignIn.jsonString().c_str());
 
     FirebaseJson     json;
     FirebaseJsonData tsData, nameData, successData;
-    json.setJsonData(_fbDataRead.jsonString());
+    json.setJsonData(_fbDataSignIn.jsonString());
 
     size_t count = json.iteratorBegin();
     Serial.printf("[FB] Iterator count: %d\n", count);

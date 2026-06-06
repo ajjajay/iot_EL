@@ -438,10 +438,7 @@ void loop() {
     // ── MONITORING ────────────────────────────────────────────────────────────
     if (state == DeviceState::MONITORING) {
 
-        // Hold sign-in result on LCD for 20 s (non-blocking)
-        if (now < signInDisplayUntil) return;
-
-        // Poll dashboard sign-ins every 5 s
+        // Poll dashboard sign-ins every 5 s — always runs, even while displaying
         if (now - lastSignInPollMs >= 5000) {
             lastSignInPollMs = now;
             char   siName[32];
@@ -449,11 +446,14 @@ void loop() {
             double siTs;
             if (firebase->pollLatestSignIn(lastSignInTs, siName, sizeof(siName),
                                            siSuccess, siTs)) {
-                lastSignInTs     = siTs;
+                lastSignInTs       = siTs;
                 signInDisplayUntil = now + 20000;
-                lcd->showAuth(siSuccess, siName);
+                lcd->showAuth(siSuccess, siName);  // immediately overrides whatever is on LCD
             }
         }
+
+        // Suppress sensor screen cycling while showing a sign-in result
+        if (now < signInDisplayUntil) return;
 
         // Enrollment (iris path only)
         if (enrollPending && c.cameraEnabled) {
