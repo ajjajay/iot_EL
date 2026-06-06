@@ -60,6 +60,7 @@ private:
     static constexpr uint16_t RETRY_DELAY_MS = 100;
 
     SensorReading _doRead();
+    SensorReading _fallback();
     float         _applyEma(float& ema, float newVal) const;
     float         _readDistance();
 };

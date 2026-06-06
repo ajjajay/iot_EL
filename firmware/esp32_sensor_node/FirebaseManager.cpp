@@ -293,6 +293,70 @@ String FirebaseManager::uploadJpegToStorage(const uint8_t* buf, size_t len,
     return "";
 }
 
+// ── Dashboard sign-in poll ────────────────────────────────────────────────────
+
+bool FirebaseManager::pollLatestSignIn(double lastSeenTs, char* outName, uint8_t nameLen,
+                                        bool& outSuccess, double& outTs) {
+    if (!_connected || !Firebase.ready()) return false;
+
+    String path = String("/signins/") + _deviceId;
+
+    // orderBy("$key") works without a Firebase index — push IDs are time-ordered
+    QueryFilter q;
+    q.orderBy("$key").limitToLast(1);
+
+    Serial.println("[FB] Polling latest sign-in...");
+
+    if (!Firebase.RTDB.getJSON(&_fbDataRead, path.c_str(), &q)) {
+        Serial.printf("[FB] pollLatestSignIn failed: %s\n",
+                      _fbDataRead.errorReason().c_str());
+        return false;
+    }
+
+    Serial.printf("[FB] Raw JSON: %s\n", _fbDataRead.jsonString().c_str());
+
+    FirebaseJson     json;
+    FirebaseJsonData tsData, nameData, successData;
+    json.setJsonData(_fbDataRead.jsonString());
+
+    size_t count = json.iteratorBegin();
+    Serial.printf("[FB] Iterator count: %d\n", count);
+    if (count == 0) { json.iteratorEnd(); return false; }
+
+    String childKey, childVal;
+    int    childType;
+    json.iteratorGet(0, childType, childKey, childVal);
+    json.iteratorEnd();
+
+    Serial.printf("[FB] Child key: %s  val: %s\n", childKey.c_str(), childVal.c_str());
+
+    FirebaseJson child;
+    child.setJsonData(childVal);
+
+    child.get(tsData, "ts");
+    if (!tsData.success) {
+        Serial.println("[FB] ts field missing");
+        return false;
+    }
+
+    double ts = tsData.to<double>();
+    Serial.printf("[FB] ts=%.0f  lastSeen=%.0f\n", ts, lastSeenTs);
+    if (ts <= lastSeenTs) return false;
+
+    outTs = ts;
+
+    child.get(nameData,    "userName");
+    child.get(successData, "success");
+
+    const char* name = nameData.success ? nameData.to<const char*>() : "Unknown";
+    strlcpy(outName, name, nameLen);
+    outSuccess = successData.success ? successData.to<bool>() : false;
+
+    Serial.printf("[FB] New sign-in → %s  success=%s\n",
+                  outName, outSuccess ? "Y" : "N");
+    return true;
+}
+
 // ── Path helpers ──────────────────────────────────────────────────────────────
 
 String FirebaseManager::_devicePath() const {

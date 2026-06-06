@@ -24,6 +24,8 @@
  *   TensorFlowLite_ESP32 (optional — env risk score)
  */
 
+#define ML_DISABLED
+
 #include <WiFi.h>
 #include <time.h>
 #include "ConfigManager.h"
@@ -81,6 +83,11 @@ bool enrollPending           = false;
 // ── Latest sensor reading + ML result (kept for LCD cycling) ─────────────────
 SensorReading lastEnvReading;
 MLResult      lastMlResult;
+
+// ── Dashboard sign-in tracking ────────────────────────────────────────────────
+double        lastSignInTs      = 0;
+unsigned long lastSignInPollMs  = 0;
+unsigned long signInDisplayUntil = 0;  // millis() until which to hold LCD message
 
 // ── WiFi helper ───────────────────────────────────────────────────────────────
 static bool connectWifi(const char* ssid, const char* pass,
@@ -430,6 +437,23 @@ void loop() {
 
     // ── MONITORING ────────────────────────────────────────────────────────────
     if (state == DeviceState::MONITORING) {
+
+        // Hold sign-in result on LCD for 20 s (non-blocking)
+        if (now < signInDisplayUntil) return;
+
+        // Poll dashboard sign-ins every 5 s
+        if (now - lastSignInPollMs >= 5000) {
+            lastSignInPollMs = now;
+            char   siName[32];
+            bool   siSuccess;
+            double siTs;
+            if (firebase->pollLatestSignIn(lastSignInTs, siName, sizeof(siName),
+                                           siSuccess, siTs)) {
+                lastSignInTs     = siTs;
+                signInDisplayUntil = now + 20000;
+                lcd->showAuth(siSuccess, siName);
+            }
+        }
 
         // Enrollment (iris path only)
         if (enrollPending && c.cameraEnabled) {

@@ -79,6 +79,12 @@ public:
     bool pollEnrollCommand(char* outUserId, uint8_t userIdLen,
                            char* outName,   uint8_t nameLen);
 
+    // Poll /signins/{deviceId} for the latest sign-in pushed by the dashboard.
+    // Returns true if a sign-in newer than lastSeenTs is found.
+    // Fills outName, outSuccess, outTs.
+    bool pollLatestSignIn(double lastSeenTs, char* outName, uint8_t nameLen,
+                          bool& outSuccess, double& outTs);
+
     bool isConnected() const { return _connected; }
 
 private:

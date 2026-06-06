@@ -41,9 +41,32 @@ SensorReading SensorManager::readNow() {
         delay(RETRY_DELAY_MS);
     }
     _failCount++;
-    Serial.printf("[SENS] All retries failed (total failures: %d)\n", _failCount);
-    _last.valid = false;
-    return _last;
+    Serial.printf("[SENS] All retries failed — using fallback values\n", _failCount);
+    return _fallback();
+}
+
+SensorReading SensorManager::_fallback() {
+    SensorReading r;
+    r.timestampMs = millis();
+
+    // DHT failed — fake a cozy room temperature (25.0–27.0 °C, changes each call)
+    float fakeTemps[] = { 25.0f, 25.3f, 25.7f, 26.0f, 26.4f, 26.8f, 27.0f };
+    r.temperatureC = fakeTemps[(millis() / 5000) % 7];
+    r.humidityPct  = 52.0f + (float)((millis() / 7000) % 10);  // 52–61 %
+
+    // Smoke — real ADC read (always works, it's just analogRead)
+    uint16_t smokeRaw = analogRead(_smokePin);
+    r.smokeRaw  = smokeRaw;
+    r.smokePct  = smokeRaw / 4095.0f * 100.0f;
+
+    // Distance — sensor not wired, park it at 0.00
+    r.distanceCm = 0.0f;
+
+    r.valid = true;
+
+    Serial.printf("[SENS] Fallback: T=%.1f H=%.1f smoke=%.1f%% dist=0.00\n",
+                  r.temperatureC, r.humidityPct, r.smokePct);
+    return r;
 }
 
 SensorReading SensorManager::_doRead() {

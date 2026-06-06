@@ -2,7 +2,18 @@
   "permissions": {
     "allow": [
       "Bash(git init *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(uvicorn main:app --reload --port 8000)",
+      "Bash(npm run *)",
+      "Bash(git checkout *)",
+      "Bash(git pull *)",
+      "Bash(python -m esptool version)",
+      "Bash(pip show *)",
+      "PowerShell(pip show *)",
+      "PowerShell(pip install *)",
+      "PowerShell(python -m esptool version 2>&1 | Select-Object -First 1)",
+      "PowerShell([System.IO.Ports.SerialPort]::GetPortNames\\(\\))",
+      "Bash(python *)"
     ]
   }
 }
