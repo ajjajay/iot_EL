@@ -208,6 +208,11 @@ export default function QrPanel({ devices }) {
           <p style={{ fontFamily: 'monospace', fontSize: '1.4rem', letterSpacing: '4px', fontWeight: 'bold', margin: 0 }}>
             {qrData.token}
           </p>
+          {qrData.emailSent && (
+            <p style={{ color: 'var(--color-ok, #22c55e)', fontSize: '0.82rem', margin: 0 }}>
+              ✓ QR code also sent to your email
+            </p>
+          )}
           <p style={{ color: 'var(--color-muted)', fontSize: '0.8rem', margin: 0 }}>
             Expires in {qrData.expiresIn}s · scan the QR or type the code below
           </p>

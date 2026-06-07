@@ -1,15 +1,19 @@
 """
 routers/qr.py — QR Code fallback authentication
 =================================================
-POST /api/qr/request  — generate a one-time token, return QR as base64 PNG
+POST /api/qr/request  — generate a one-time token, email QR + return base64 PNG
 POST /api/qr/verify   — verify the token and write Access Granted to Firebase
 """
 
 import base64
 import io
 import os
+import smtplib
 import time
 import uuid
+from email.mime.image     import MIMEImage
+from email.mime.multipart import MIMEMultipart
+from email.mime.text      import MIMEText
 
 import qrcode
 from fastapi  import APIRouter
@@ -19,7 +23,10 @@ from firebase_client import get_ref
 
 router = APIRouter()
 
-_TOKEN_TTL = int(os.getenv("QR_TOKEN_TTL_SECS", "300"))   # 5 minutes
+_GMAIL_USER   = os.getenv("GMAIL_USER",         "ajaygirish23@gmail.com")
+_GMAIL_PASS   = os.getenv("GMAIL_APP_PASSWORD",  "")
+_NOTIFY_EMAIL = os.getenv("QR_NOTIFY_EMAIL",     "ajaygirish23@gmail.com")
+_TOKEN_TTL    = int(os.getenv("QR_TOKEN_TTL_SECS", "300"))
 
 
 # ── Request body models ───────────────────────────────────────────────────────
@@ -42,14 +49,37 @@ def _make_qr_b64(token: str) -> str:
     qrcode.make(token).save(buf, format="PNG")
     return base64.b64encode(buf.getvalue()).decode()
 
+def _send_email(token: str, device_id: str, qr_b64: str) -> None:
+    qr_png = base64.b64decode(qr_b64)
+    msg = MIMEMultipart("related")
+    msg["Subject"] = f"[IoT Access] QR Code — {device_id}"
+    msg["From"]    = _GMAIL_USER
+    msg["To"]      = _NOTIFY_EMAIL
+    msg.attach(MIMEText(f"""
+    <html><body style="font-family:sans-serif;max-width:480px;margin:auto">
+      <h2 style="color:#1a1a2e">IoT Access — QR Code</h2>
+      <p>Fallback access requested for device <b>{device_id}</b>.</p>
+      <p style="font-size:2em;letter-spacing:4px;font-weight:bold;color:#0f3460">{token}</p>
+      <img src="cid:qrcode" width="200" height="200" style="display:block;margin:16px 0"/>
+      <p style="color:#888;font-size:0.85em">Expires in 5 minutes. One-time use only.</p>
+    </body></html>""", "html"))
+    img = MIMEImage(qr_png, name="qr.png")
+    img.add_header("Content-ID",          "<qrcode>")
+    img.add_header("Content-Disposition", "inline", filename="qr.png")
+    msg.attach(img)
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+        smtp.login(_GMAIL_USER, _GMAIL_PASS)
+        smtp.sendmail(_GMAIL_USER, _NOTIFY_EMAIL, msg.as_string())
+
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/qr/request")
 def qr_request(body: QrRequestBody):
     """
-    Generate a one-time QR token, store it in Firebase, and return the QR
-    image as a base64 PNG so the dashboard can display it directly.
+    Generate a one-time QR token, store it in Firebase, email it via Gmail
+    (if GMAIL_APP_PASSWORD is set), and always return the QR as base64 PNG
+    so the dashboard can display it regardless of email status.
     """
     token  = _make_token()
     expiry = int(time.time()) + _TOKEN_TTL
@@ -66,11 +96,23 @@ def qr_request(body: QrRequestBody):
         "ts":      int(time.time() * 1000),
     })
 
-    print(f"[QR] Token {token} generated for device={body.deviceId}")
+    qr_b64     = _make_qr_b64(token)
+    email_sent = False
+    if _GMAIL_PASS:
+        try:
+            _send_email(token, body.deviceId, qr_b64)
+            email_sent = True
+            print(f"[QR] Token {token} emailed for device={body.deviceId}")
+        except Exception as e:
+            print(f"[QR] Email failed: {e}")
+    else:
+        print(f"[QR] GMAIL_APP_PASSWORD not set — skipping email, token={token}")
+
     return {
         "status":    "ok",
         "token":     token,
-        "qrBase64":  _make_qr_b64(token),
+        "qrBase64":  qr_b64,
+        "emailSent": email_sent,
         "expiresIn": _TOKEN_TTL,
     }
 
