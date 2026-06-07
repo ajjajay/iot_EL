@@ -13,7 +13,12 @@
       "PowerShell(pip install *)",
       "PowerShell(python -m esptool version 2>&1 | Select-Object -First 1)",
       "PowerShell([System.IO.Ports.SerialPort]::GetPortNames\\(\\))",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\HP\\\\iot_EL\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(aws --version)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(aws sts *)"
     ]
   }
 }
