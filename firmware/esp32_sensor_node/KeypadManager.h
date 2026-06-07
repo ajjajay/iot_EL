@@ -4,7 +4,7 @@
  * Wraps the Keypad library for the 3×4 matrix keypad.
  *
  * Pin mapping (fixed — matches physical wiring):
- *   ROW1=13  ROW2=12  ROW3=14  ROW4=27
+ *   ROW1=14  ROW2=12  ROW3=13  ROW4=27
  *   COL1=26  COL2=25  COL3=33
  *
  * Key layout:

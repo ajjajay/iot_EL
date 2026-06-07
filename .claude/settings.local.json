@@ -12,13 +12,27 @@
       "PowerShell(pip show *)",
       "PowerShell(pip install *)",
       "PowerShell(python -m esptool version 2>&1 | Select-Object -First 1)",
-      "PowerShell([System.IO.Ports.SerialPort]::GetPortNames\\(\\))",
+      "PowerShell([System.IO.Ports.SerialPort]::GetPortNames\(\))",
       "Bash(python *)",
-      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\HP\\\\iot_EL\" -Directory)",
+      "Bash(Get-ChildItem -Path \"c:\\Users\\HP\\iot_EL\" -Directory)",
       "Bash(Select-Object Name)",
       "Bash(aws --version)",
       "Bash(echo \"exit:$?\")",
-      "Bash(aws sts *)"
+      "Bash(aws sts *)",
+      "Bash(dir C:\\Users\\AjayG\\Desktop\\testlcd *)",
+      "Skill(run)",
+      "Bash(echo \"Backend PID: $!\")",
+      "Bash(echo \"Frontend PID: $!\")",
+      "Bash(curl *)",
+      "Bash(pkill -f \"uvicorn main:app\")",
+      "Bash(pkill -f \"uvicorn\")",
+      "Bash(python -m uvicorn main:app --port 8000)",
+      "Bash(pkill -f \"uvicorn\\|python.*main\")",
+      "Bash(netstat -ano)",
+      "Bash(taskkill *)",
+      "Bash(npm install *)",
+      "Bash(npm list *)",
+      "Bash(pkill -f \"vite\")"
     ]
   }
 }

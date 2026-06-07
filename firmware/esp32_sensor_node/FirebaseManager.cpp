@@ -357,6 +357,18 @@ bool FirebaseManager::pollLatestSignIn(double lastSeenTs, char* outName, uint8_t
     return true;
 }
 
+void FirebaseManager::requestQrCode() {
+    String path = _devicePath() + "/commands/qrRequest";
+    FirebaseJson json;
+    json.set("pending", true);
+    json.set("ts",      (int)(millis()));
+    if (Firebase.RTDB.setJSON(&_fbData, path.c_str(), &json)) {
+        Serial.println("[FB] QR code request written");
+    } else {
+        Serial.printf("[FB] QR request failed: %s\n", _fbData.errorReason().c_str());
+    }
+}
+
 // ── Path helpers ──────────────────────────────────────────────────────────────
 
 String FirebaseManager::_devicePath() const {

@@ -18,6 +18,10 @@ numpy>=1.24.0
 # Google Gemini SDK (voice update / LLM briefings)
 google-genai>=0.8.0
 
+# QR code generation (fallback auth)
+qrcode[pil]>=7.4.2
+pillow>=10.0.0
+
 # Env var loading for local development
 python-dotenv>=1.0.0
 

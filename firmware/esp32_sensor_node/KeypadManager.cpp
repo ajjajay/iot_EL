@@ -7,14 +7,14 @@ char KeypadManager::_keys[4][3] = {
     {'*', '0', '#'}
 };
 
-byte KeypadManager::_rowPins[4] = {13, 12, 14, 27};
+byte KeypadManager::_rowPins[4] = {14, 12, 13, 27};
 byte KeypadManager::_colPins[3] = {26, 25, 33};
 
 KeypadManager::KeypadManager()
     : _kp(makeKeymap(_keys), _rowPins, _colPins, 4, 3) {}
 
 void KeypadManager::begin() {
-    Serial.println("[KPD] Keypad ready (3x4 matrix)");
+    Serial.println("[KPD] Keypad ready (4x3 matrix)");
 }
 
 char KeypadManager::getKey() {
