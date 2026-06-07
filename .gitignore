@@ -79,6 +79,7 @@ scripts/.env
 # Lambda build artefacts (pip-installed packages + zips)
 lambda/_build/
 lambda/**/*.zip
+lambda/**/package/
 
 # AWS IoT certificates — NEVER commit these (private key + device cert)
 aws_certificates.h
