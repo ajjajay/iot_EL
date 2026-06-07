@@ -24,8 +24,8 @@ ENROLL_FN="iot-enrollment-indexer"
 : "${FIREBASE_SERVICE_ACCOUNT_B64:?Set FIREBASE_SERVICE_ACCOUNT_B64}"
 : "${FIREBASE_DATABASE_URL:?Set FIREBASE_DATABASE_URL}"
 
-FIREBASE_STORAGE_BUCKET="${FIREBASE_STORAGE_BUCKET:-iot-fc8b3.firebasestorage.app}"
-IOT_ENDPOINT="a39l1ahbq3uw0h-ats.iot.ap-south-1.amazonaws.com"
+: "${FIREBASE_STORAGE_BUCKET:?Set FIREBASE_STORAGE_BUCKET}"
+: "${IOT_ENDPOINT:?Set IOT_ENDPOINT (from AWS IoT Core → Settings → Endpoint)}"
 
 # ── 1. Rekognition collection ─────────────────────────────────────────────────
 echo "── Creating Rekognition collection: $COLLECTION"
@@ -42,7 +42,7 @@ SNS_TOPIC_ARN=$(aws sns create-topic \
 echo "  ARN: $SNS_TOPIC_ARN"
 
 # Subscribe your email (edit this)
-ADMIN_EMAIL="${ADMIN_EMAIL:-ajaygirish23@gmail.com}"
+: "${ADMIN_EMAIL:?Set ADMIN_EMAIL (your notification email)}"
 aws sns subscribe \
     --topic-arn "$SNS_TOPIC_ARN" \
     --protocol email \

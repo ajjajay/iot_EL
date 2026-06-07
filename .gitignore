@@ -72,7 +72,13 @@ firebase-adminsdk*.json
 .claude/
 scripts/certs/
 frontend/.env
+frontend/.env.local
 scripts/.env
+**/.env.local
+
+# Lambda build artefacts (pip-installed packages + zips)
+lambda/_build/
+lambda/**/*.zip
 
 # AWS IoT certificates — NEVER commit these (private key + device cert)
 aws_certificates.h

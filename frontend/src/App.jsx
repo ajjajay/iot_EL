@@ -154,9 +154,44 @@ function AppInner() {
 
   const handleWebcamAuth = useCallback(async (deviceId, result) => {
     if (isDemo) {
-      showToast(result.matched ? `[Demo] Access granted: ${result.userName}` : '[Demo] Access denied', result.matched ? 'ok' : 'alert');
+      showToast(
+        result.matched ? `[Demo] Access granted: ${result.userName}` : '[Demo] Access denied',
+        result.matched ? 'ok' : 'alert',
+      );
       return;
     }
+
+    if (result.livenessFailed) {
+      // Log the spoof attempt to Firebase so it appears in the signin log and alerts tab
+      const ts = Date.now();
+      await push(ref(db, `/signins/${deviceId}`), {
+        userId: 'unknown', userName: 'Unknown',
+        deviceId, matchScore: 1, success: false,
+        anomalyScore: 1.0, source: 'liveness_failed', ts,
+      });
+      await push(ref(db, `/alerts/${deviceId}`), {
+        deviceId, alertType: 'spoof_attempt',
+        userId: 'unknown', anomalyScore: 1.0, acknowledged: false, ts,
+      });
+      showToast('Spoof detected — access denied', 'alert');
+      return;
+    }
+
+    if (result.lambdaHandled) {
+      // Lambda already wrote the signin record and set relayOverride in Firebase.
+      // Just surface the result to the operator via toast.
+      if (result.granted) {
+        showToast(`Access granted — ${result.userName}`, 'ok');
+      } else {
+        const reason = result.reason === 'anomaly'
+          ? `Anomalous pattern detected for ${result.userName}`
+          : 'No face match';
+        showToast(`Access denied — ${reason}`, 'alert');
+      }
+      return;
+    }
+
+    // Local matching fallback (no API URL configured): write to Firebase ourselves.
     await push(ref(db, `/signins/${deviceId}`), {
       userId: result.userId ?? 'unknown', userName: result.userName ?? 'Unknown',
       deviceId, matchScore: result.score, success: result.matched, anomalyScore: 0, ts: Date.now(),
@@ -178,8 +213,13 @@ function AppInner() {
       showToast(`[Demo] ${name} enrolled via webcam`, 'ok');
       return;
     }
-    await set(ref(db, `/users/${userId}`), { userId, name, deviceId, enrolledAt: Date.now(), active: true, template });
-    showToast(`${name} enrolled via webcam`, 'ok');
+
+    if (template) {
+      // Local mode: Lambda not in use — save iris template directly to Firebase.
+      await set(ref(db, `/users/${userId}`), { userId, name, deviceId, enrolledAt: Date.now(), active: true, template });
+    }
+    // Rekognition mode: Lambda already wrote the user record to Firebase (/users/{userId}).
+    showToast(`${name} enrolled`, 'ok');
   }, [isDemo, showToast]);
 
   const handleClearAlerts = useCallback(() => {

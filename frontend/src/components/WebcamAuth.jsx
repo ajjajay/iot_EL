@@ -3,20 +3,33 @@ import { extractFeatures } from '../utils/irisFeatures.js';
 import { matchAgainstUsers } from '../utils/biometricMatch.js';
 import { checkLiveness } from '../utils/livenessCheck.js';
 
+const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL ?? '';
+
+// Captures the current video frame as a base64 JPEG at the video's native resolution.
+function captureJpegBase64(videoEl) {
+  const w   = videoEl.videoWidth  || 640;
+  const h   = videoEl.videoHeight || 480;
+  const tmp = document.createElement('canvas');
+  tmp.width  = w;
+  tmp.height = h;
+  tmp.getContext('2d').drawImage(videoEl, 0, 0, w, h);
+  return tmp.toDataURL('image/jpeg', 0.85).split(',')[1];
+}
+
 // phase: idle → live → liveness → result
 export default function WebcamAuth({ devices, users, onResult }) {
-  const videoRef     = useRef(null);
-  const canvasRef    = useRef(null);
-  const streamRef    = useRef(null);
+  const videoRef  = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
 
-  const [deviceId,  setDeviceId]  = useState('');
+  const [deviceId,      setDeviceId]      = useState('');
   const [phase,         setPhase]         = useState('idle');
   const [result,        setResult]        = useState(null);
   const [liveness,      setLiveness]      = useState(null);
   const [camErr,        setCamErr]        = useState('');
   const [busy,          setBusy]          = useState(false);
-  const [progress,      setProgress]      = useState(0);   // 0-100
-  const [livenessPhase, setLivenessPhase] = useState('');  // descriptive label
+  const [progress,      setProgress]      = useState(0);
+  const [livenessPhase, setLivenessPhase] = useState('');
 
   const deviceIds = Object.keys(devices);
 
@@ -24,7 +37,6 @@ export default function WebcamAuth({ devices, users, onResult }) {
     if (deviceIds.length > 0 && !deviceId) setDeviceId(deviceIds[0]);
   }, [deviceIds.length]);
 
-  // Attach stream once video element is in DOM
   useEffect(() => {
     if (phase !== 'idle' && videoRef.current && streamRef.current) {
       videoRef.current.srcObject = streamRef.current;
@@ -79,7 +91,7 @@ export default function WebcamAuth({ devices, users, onResult }) {
     setLivenessPhase('Starting…');
 
     try {
-      // ── Step 1: Liveness check ─────────────────────────────────────────────
+      // ── Step 1: Liveness check (anti-spoofing) ────────────────────────────
       const lv = await checkLiveness(videoRef.current, canvasRef.current, {
         onPhase:    label => setLivenessPhase(label),
         onProgress: pct   => setProgress(pct),
@@ -87,23 +99,60 @@ export default function WebcamAuth({ devices, users, onResult }) {
       setLiveness(lv);
 
       if (!lv.live) {
-        // Liveness failed — log a denied attempt and stop
-        const r = { matched: false, userId: null, userName: null, score: 1, livenessScore: lv.score, livenessFailed: true };
+        const r = {
+          matched: false, granted: false, userId: null, userName: null,
+          score: 1, livenessScore: lv.score, livenessFailed: true,
+        };
         setResult(r);
         setPhase('result');
         try { await onResult(deviceId, r); } catch {}
         return;
       }
 
-      // ── Step 2: Iris matching ──────────────────────────────────────────────
-      const features = extractFeatures(videoRef.current, canvasRef.current);
-      const enrolledUsers = Object.values(users).filter(u => u.active && Array.isArray(u.template));
-
+      // ── Step 2: Face recognition ──────────────────────────────────────────
       let r;
-      if (enrolledUsers.length === 0) {
-        r = { matched: false, userId: null, userName: 'No enrolled users', score: 1, livenessScore: lv.score, livenessFailed: false };
+
+      if (AUTH_API_URL) {
+        // Cloud path: send JPEG to API Gateway → Lambda → Rekognition
+        setLivenessPhase('Sending to Rekognition…');
+        setProgress(100);
+
+        const imageBase64 = captureJpegBase64(videoRef.current);
+        const resp = await fetch(`${AUTH_API_URL}/auth`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ deviceId, imageBase64 }),
+        });
+
+        if (!resp.ok) throw new Error(`Auth API error: ${resp.status}`);
+        const data = await resp.json();
+
+        r = {
+          matched:        data.granted,
+          granted:        data.granted,
+          reason:         data.reason  ?? null,
+          userId:         data.userId  ?? null,
+          userName:       data.userName ?? (data.granted ? 'Recognised' : 'Unknown'),
+          score:          data.matchScore ?? (data.granted ? 0 : 1),
+          livenessScore:  lv.score,
+          livenessFailed: false,
+          lambdaHandled:  true,   // signals App.jsx that Firebase writes are done
+        };
       } else {
-        r = { ...matchAgainstUsers(features, users), livenessScore: lv.score, livenessFailed: false };
+        // Local fallback: run iris matching in-browser (demo / no API URL set)
+        const features = extractFeatures(videoRef.current, canvasRef.current);
+        const enrolledUsers = Object.values(users).filter(u => u.active && Array.isArray(u.template));
+
+        if (enrolledUsers.length === 0) {
+          r = {
+            matched: false, granted: false, userId: null,
+            userName: 'No enrolled users', score: 1,
+            livenessScore: lv.score, livenessFailed: false,
+          };
+        } else {
+          const m = matchAgainstUsers(features, users);
+          r = { ...m, granted: m.matched, livenessScore: lv.score, livenessFailed: false };
+        }
       }
 
       setResult(r);
@@ -120,6 +169,8 @@ export default function WebcamAuth({ devices, users, onResult }) {
   }
 
   const enrolledWithTemplates = Object.values(users).filter(u => u.active && Array.isArray(u.template)).length;
+  // In Rekognition mode users have no local template — hide the warning
+  const showNoUsersWarning = !AUTH_API_URL && enrolledWithTemplates === 0;
 
   return (
     <div className="webcam-auth-panel">
@@ -159,7 +210,6 @@ export default function WebcamAuth({ devices, users, onResult }) {
             )}
           </div>
 
-          {/* Blink instruction banner */}
           {phase === 'liveness' && progress < 85 && (
             <div className="blink-instruction">
               <span className="blink-eye-icon">👁</span>
@@ -167,7 +217,6 @@ export default function WebcamAuth({ devices, users, onResult }) {
             </div>
           )}
 
-          {/* Liveness result card */}
           {liveness && (
             <div className={`liveness-card ${liveness.live ? 'liveness-ok' : 'liveness-fail'}`}>
               <div className="liveness-card-header">
@@ -178,8 +227,10 @@ export default function WebcamAuth({ devices, users, onResult }) {
                 <span className="liveness-score">{liveness.score}/100</span>
               </div>
               <div className="liveness-bar-bg">
-                <div className={`liveness-score-bar ${liveness.live ? 'liveness-score-ok' : 'liveness-score-fail'}`}
-                  style={{ width: `${liveness.score}%` }} />
+                <div
+                  className={`liveness-score-bar ${liveness.live ? 'liveness-score-ok' : 'liveness-score-fail'}`}
+                  style={{ width: `${liveness.score}%` }}
+                />
               </div>
               <p className="liveness-reason">{liveness.reason}</p>
             </div>
@@ -204,10 +255,12 @@ export default function WebcamAuth({ devices, users, onResult }) {
           {phase === 'result' && result && !result.livenessFailed && (
             <div className={`auth-result-badge ${result.matched ? 'result-ok' : 'result-fail'}`}>
               {result.matched
-                ? `Access granted — ${result.userName}  (iris score: ${result.score.toFixed(3)}, liveness: ${result.livenessScore}/100)`
-                : enrolledWithTemplates === 0
-                  ? 'No webcam-enrolled users found. Go to Users → Enroll New User → Laptop Camera tab first.'
-                  : `Access denied  (best iris score: ${result.score.toFixed(3)}, threshold: 0.30)`}
+                ? `Access granted — ${result.userName}  (score: ${result.score.toFixed(3)}, liveness: ${result.livenessScore}/100)`
+                : result.reason === 'anomaly'
+                  ? `Access denied — anomalous pattern detected for ${result.userName}`
+                  : showNoUsersWarning
+                    ? 'No webcam-enrolled users found. Go to Users → Enroll New User → Laptop Camera tab first.'
+                    : `Access denied  (best score: ${result.score.toFixed(3)})`}
             </div>
           )}
 
@@ -221,7 +274,7 @@ export default function WebcamAuth({ devices, users, onResult }) {
 
       {phase === 'idle' && (
         <div className="webcam-idle">
-          {enrolledWithTemplates === 0 && (
+          {showNoUsersWarning && (
             <p className="webcam-warn">
               No webcam-enrolled users yet. Go to <strong>Users</strong> → Enroll New User → Laptop Camera tab to enroll yourself first.
             </p>

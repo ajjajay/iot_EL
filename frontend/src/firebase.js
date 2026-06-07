@@ -3,14 +3,14 @@ import { getDatabase } from 'firebase/database';
 import { getAuth } from 'firebase/auth';
 
 export const FIREBASE_CONFIG = {
-  apiKey:            "AIzaSyBsbx7C15g-Ws6yIYtNo3zd7vU5geQwS8g",
-  authDomain:        "iot-fc8b3.firebaseapp.com",
-  databaseURL:       "https://iot-fc8b3-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId:         "iot-fc8b3",
-  storageBucket:     "iot-fc8b3.firebasestorage.app",
-  messagingSenderId: "764355810285",
-  appId:             "1:764355810285:web:5301eb89107e45a5090de4",
-  measurementId:     "G-MG3PHYQ22V",
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  databaseURL:       import.meta.env.VITE_FIREBASE_DATABASE_URL,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 export const DASH_EMAIL    = import.meta.env.VITE_DASH_EMAIL;

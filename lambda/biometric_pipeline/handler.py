@@ -18,7 +18,7 @@ Required environment variables (set in Lambda console):
   SNS_TOPIC_ARN                 — e.g. arn:aws:sns:ap-south-1:123456789:iot-biometric-alerts
   REKOGNITION_COLLECTION        — default: iot-biometric-faces
   REKOGNITION_MATCH_THRESHOLD   — default: 80  (similarity %)
-  AWS_IOT_ENDPOINT              — a39l1ahbq3uw0h-ats.iot.ap-south-1.amazonaws.com
+  AWS_IOT_ENDPOINT              — your-endpoint-id-ats.iot.ap-south-1.amazonaws.com
 """
 
 import json

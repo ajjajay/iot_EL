@@ -20,7 +20,8 @@ export function useSignins(db) {
       const sUnsub = onChildAdded(q, sSnap => {
         const ev = { ...sSnap.val(), deviceId: id };
         setSignins(prev => {
-          const arr = [ev, ...(prev[id] || [])];
+          const arr = [...(prev[id] || []), ev]
+            .sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0));
           return { ...prev, [id]: arr.length > MAX ? arr.slice(0, MAX) : arr };
         });
       });

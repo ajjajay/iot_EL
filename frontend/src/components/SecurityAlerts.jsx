@@ -1,4 +1,4 @@
-import { ALERT_LABELS, formatTs } from '../utils/formatters.js';
+import { ALERT_LABELS, formatTsMs } from '../utils/formatters.js';
 
 export default function SecurityAlerts({ alerts, onClear }) {
   return (
@@ -12,7 +12,7 @@ export default function SecurityAlerts({ alerts, onClear }) {
           <div className="no-alerts">No security alerts — all sign-ins normal</div>
         ) : alerts.map((alert, i) => {
           const isBio = !!alert.alertType && alert.alertType !== 'high_env_risk';
-          const ts    = formatTs(alert.ts);
+          const ts    = formatTsMs(alert.ts);
           return (
             <div key={i} className={`alert-item ${isBio ? 'bio-alert-item' : 'warning-item'}`}>
               <div className="alert-device">{alert.deviceId}</div>

@@ -2,6 +2,20 @@ import { useState, useRef, useEffect } from 'react';
 import { useToast } from './ToastContainer.jsx';
 import { extractFeatures, averageFeatures } from '../utils/irisFeatures.js';
 
+const AUTH_API_URL   = import.meta.env.VITE_AUTH_API_URL ?? '';
+const USE_REKOGNITION = !!AUTH_API_URL;
+
+// Captures the current video frame as a base64 JPEG at native resolution.
+function captureJpegBase64(videoEl) {
+  const w   = videoEl.videoWidth  || 640;
+  const h   = videoEl.videoHeight || 480;
+  const tmp = document.createElement('canvas');
+  tmp.width  = w;
+  tmp.height = h;
+  tmp.getContext('2d').drawImage(videoEl, 0, 0, w, h);
+  return tmp.toDataURL('image/jpeg', 0.85).split(',')[1];
+}
+
 export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
   const showToast = useToast();
 
@@ -14,14 +28,15 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
 
-  const [camPhase, setCamPhase] = useState('idle'); // idle | live | capturing | done
-  const [progress, setProgress] = useState(0);
-  const [camErr,   setCamErr]   = useState('');
-  const [template, setTemplate] = useState(null);
+  // camPhase: idle | live | capturing | done
+  const [camPhase,    setCamPhase]    = useState('idle');
+  const [progress,    setProgress]    = useState(0);
+  const [camErr,      setCamErr]      = useState('');
+  const [template,    setTemplate]    = useState(null);   // local mode: float32 array
+  const [imageBase64, setImageBase64] = useState(null);   // Rekognition mode: JPEG b64
 
   const deviceIds = Object.keys(devices);
 
-  // Attach stream once video element is in the DOM
   useEffect(() => {
     if (camPhase !== 'idle' && videoRef.current && streamRef.current) {
       videoRef.current.srcObject = streamRef.current;
@@ -41,6 +56,7 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
     setCamPhase('idle');
     setProgress(0);
     setTemplate(null);
+    setImageBase64(null);
     setCamErr('');
     setMode(m);
   }
@@ -69,7 +85,7 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
       streamRef.current = s;
-      setCamPhase('live'); // video element renders → useEffect attaches stream
+      setCamPhase('live');
     } catch (err) {
       if (err.name === 'NotAllowedError') {
         setCamErr('Camera permission denied. Allow access in the browser address bar.');
@@ -86,6 +102,7 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
     setCamPhase('idle');
     setProgress(0);
     setTemplate(null);
+    setImageBase64(null);
   }
 
   async function captureFrames() {
@@ -95,22 +112,60 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
     if (!name.trim()) { showToast("Enter the user's name", 'info'); return; }
 
     setCamPhase('capturing');
-    const frames = [];
-    for (let i = 0; i < 5; i++) {
-      await new Promise(r => setTimeout(r, 350));
-      frames.push(extractFeatures(videoRef.current, canvasRef.current));
-      setProgress(i + 1);
+
+    if (USE_REKOGNITION) {
+      // Rekognition mode: capture a single JPEG snapshot
+      await new Promise(r => setTimeout(r, 200)); // brief pause so face is stable
+      setImageBase64(captureJpegBase64(videoRef.current));
+      setCamPhase('done');
+    } else {
+      // Local mode: capture 5 frames, average iris descriptors
+      const frames = [];
+      for (let i = 0; i < 5; i++) {
+        await new Promise(r => setTimeout(r, 350));
+        frames.push(extractFeatures(videoRef.current, canvasRef.current));
+        setProgress(i + 1);
+      }
+      setTemplate(averageFeatures(frames));
+      setCamPhase('done');
     }
-    setTemplate(averageFeatures(frames));
-    setCamPhase('done');
   }
 
   async function confirmEnroll() {
     const uid = userId.trim().replace(/\s+/g, '_');
     try {
-      await onWebcamEnroll(deviceId, uid, name.trim(), template);
-      cancelWebcam();
-      setUserId(''); setName('');
+      if (USE_REKOGNITION && imageBase64) {
+        // Send JPEG to Lambda enroll endpoint → Rekognition IndexFaces → Firebase write
+        const resp = await fetch(`${AUTH_API_URL}/enroll`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            deviceId,
+            userId:      uid,
+            name:        name.trim(),
+            imageBase64,
+          }),
+        });
+        if (!resp.ok) throw new Error(`Enroll API error: ${resp.status}`);
+        const data = await resp.json();
+
+        if (data.status === 'no_face') {
+          showToast('No face detected — try again with better lighting', 'alert');
+          setCamPhase('live');  // let them re-capture
+          setImageBase64(null);
+          return;
+        }
+
+        // Lambda wrote the user record to Firebase; notify parent (no template)
+        await onWebcamEnroll(deviceId, uid, name.trim(), null);
+        cancelWebcam();
+        setUserId(''); setName('');
+      } else if (template) {
+        // Local mode: pass the averaged template to parent, which saves it to Firebase
+        await onWebcamEnroll(deviceId, uid, name.trim(), template);
+        cancelWebcam();
+        setUserId(''); setName('');
+      }
     } catch (e) {
       showToast(`Enrollment failed: ${e.message}`, 'alert');
     }
@@ -156,11 +211,11 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
       {mode === 'webcam' && (
         <div className="webcam-enroll-body">
           <p className="section-subtitle">
-            Captures 5 frames from your laptop camera, averages the iris descriptor,
-            and stores the template directly in Firebase.
+            {USE_REKOGNITION
+              ? 'Captures a photo from your laptop camera and indexes your face in AWS Rekognition.'
+              : 'Captures 5 frames from your laptop camera, averages the iris descriptor, and stores the template directly in Firebase.'}
           </p>
 
-          {/* Always render video+canvas so refs exist when state changes */}
           <div style={{ display: camPhase === 'idle' ? 'none' : 'block' }}>
             <div className="webcam-live">
               <div className="webcam-video-wrap">
@@ -168,18 +223,18 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
                 <canvas ref={canvasRef} style={{ display: 'none' }} />
                 {camPhase === 'capturing' && (
                   <div className="webcam-overlay overlay-capture">
-                    Capturing {progress} / 5…
+                    {USE_REKOGNITION ? 'Capturing photo…' : `Capturing ${progress} / 5…`}
                   </div>
                 )}
                 {camPhase === 'done' && (
-                  <div className="webcam-overlay overlay-ok">✓ Template ready</div>
+                  <div className="webcam-overlay overlay-ok">✓ Ready to enroll</div>
                 )}
               </div>
 
               <div className="webcam-controls">
                 {camPhase === 'live' && (
                   <button className="btn btn-primary" onClick={captureFrames}>
-                    Capture (5 frames)
+                    {USE_REKOGNITION ? 'Capture Photo' : 'Capture (5 frames)'}
                   </button>
                 )}
                 {camPhase === 'done' && (

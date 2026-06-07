@@ -36,10 +36,12 @@
 
     // ── Biometric sign-in log ─────────────────────────────────────────────────
     // Each device appends its own sign-in events.
+    // .indexOn ts required for anomaly-check frequency query (order_by_child ts).
     "signins": {
       "$deviceId": {
         ".read":  "auth != null",
-        ".write": "auth != null && auth.uid == $deviceId",
+        ".write": "auth != null",
+        ".indexOn": ["ts"],
         "$signinId": {
           ".validate": "newData.hasChildren(['userId','matchScore','success','ts'])"
         }
