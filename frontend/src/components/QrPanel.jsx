@@ -14,7 +14,8 @@ export default function QrPanel({ devices }) {
   const [scanning,   setScanning]   = useState(false);
   const [result,     setResult]     = useState(null);
   const [camErr,     setCamErr]     = useState('');
-  const [detected,   setDetected]   = useState('');  // token found but not yet verified
+  const [detected,   setDetected]   = useState('');
+  const [qrData,     setQrData]     = useState(null);  // { qrBase64, token, expiresIn }
 
   const videoRef   = useRef(null);
   const canvasRef  = useRef(null);
@@ -121,6 +122,7 @@ export default function QrPanel({ devices }) {
     if (!id) { showToast('Select a device first', 'info'); return; }
     setRequesting(true);
     setResult(null);
+    setQrData(null);
     try {
       const resp = await fetch(`${BACKEND_URL}/api/qr/request`, {
         method:  'POST',
@@ -129,11 +131,8 @@ export default function QrPanel({ devices }) {
       });
       if (!resp.ok) throw new Error(`Server error ${resp.status}`);
       const data = await resp.json();
-      if (data.emailSent) {
-        showToast('QR code emailed — open your email and scan it here', 'ok');
-      } else {
-        showToast('Token generated but email failed — check backend logs', 'alert');
-      }
+      setQrData(data);
+      showToast('QR code ready — scan it below or type the code manually', 'ok');
     } catch (e) {
       showToast(`Request failed: ${e.message}`, 'alert');
     } finally {
@@ -174,9 +173,9 @@ export default function QrPanel({ devices }) {
     <div className="enroll-panel" style={{ marginTop: '1.5rem' }}>
       <h3 className="enroll-title">QR Code Fallback Access</h3>
       <p className="section-subtitle">
-        When facial recognition fails — request a one-time QR code by email, then
-        scan it here with your laptop camera to unlock. The ESP32 keypad (press&nbsp;
-        <b>2</b>&nbsp;three times) can also trigger the email automatically.
+        When facial recognition fails — generate a one-time QR code, then scan it
+        with your camera or type the code manually to unlock. The ESP32 keypad
+        (press <b>2</b> three times) can also trigger a QR request automatically.
       </p>
 
       {/* Device selector */}
@@ -187,36 +186,55 @@ export default function QrPanel({ devices }) {
         </select>
       </div>
 
-      {/* Step 1 — send email */}
+      {/* Step 1 — generate QR */}
       <div style={{ marginTop: '0.75rem' }}>
         <button
           className="btn btn-primary"
           onClick={() => handleRequest()}
           disabled={requesting || !deviceId}
         >
-          {requesting ? 'Sending…' : '📧 Send QR Code to Email'}
+          {requesting ? 'Generating…' : '🔑 Generate QR Code'}
         </button>
-        <span style={{ marginLeft: '0.75rem', color: 'var(--color-muted)', fontSize: '0.82rem' }}>
-          Sent to ajaygirish23@gmail.com
-        </span>
       </div>
 
-      {/* Step 2 — scan */}
-      <div style={{ marginTop: '1rem' }}>
-        {!scanning ? (
+      {/* QR image + manual token display */}
+      {qrData && !result && (
+        <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
+          <img
+            src={`data:image/png;base64,${qrData.qrBase64}`}
+            alt="QR Code"
+            style={{ width: 180, height: 180, imageRendering: 'pixelated', border: '2px solid var(--color-border)', borderRadius: 8 }}
+          />
+          <p style={{ fontFamily: 'monospace', fontSize: '1.4rem', letterSpacing: '4px', fontWeight: 'bold', margin: 0 }}>
+            {qrData.token}
+          </p>
+          <p style={{ color: 'var(--color-muted)', fontSize: '0.8rem', margin: 0 }}>
+            Expires in {qrData.expiresIn}s · scan the QR or type the code below
+          </p>
+        </div>
+      )}
+
+      {/* Step 2 — scan or type */}
+      {qrData && !result && (
+        <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {!scanning ? (
+            <button className="btn btn-primary" onClick={openScanner} disabled={!deviceId}>
+              📷 Scan with Camera
+            </button>
+          ) : (
+            <button className="btn btn-danger-outline btn-sm" onClick={closeScanner}>
+              Cancel Scan
+            </button>
+          )}
           <button
             className="btn btn-primary"
-            onClick={openScanner}
+            onClick={() => verifyToken(qrData.token)}
             disabled={!deviceId}
           >
-            📷 Scan QR Code with Camera
+            ✓ Use This Code
           </button>
-        ) : (
-          <button className="btn btn-danger-outline btn-sm" onClick={closeScanner}>
-            Cancel Scan
-          </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {camErr && <p className="webcam-err" style={{ marginTop: '0.5rem' }}>{camErr}</p>}
 
@@ -226,7 +244,7 @@ export default function QrPanel({ devices }) {
           <div className="webcam-video-wrap">
             <video ref={videoRef} autoPlay playsInline muted className="webcam-video" />
             <div className="webcam-overlay overlay-capture" style={{ fontSize: '0.9rem' }}>
-              Point camera at QR code from email…
+              Point camera at QR code…
             </div>
           </div>
         </div>
@@ -257,7 +275,7 @@ export default function QrPanel({ devices }) {
         <button
           className="btn btn-primary"
           style={{ marginTop: '0.5rem' }}
-          onClick={() => { setResult(null); setDetected(''); openScanner(); }}
+          onClick={() => { setResult(null); setDetected(''); setQrData(null); }}
         >
           Try Again
         </button>
