@@ -13,7 +13,25 @@
       "PowerShell(pip install *)",
       "PowerShell(python -m esptool version 2>&1 | Select-Object -First 1)",
       "PowerShell([System.IO.Ports.SerialPort]::GetPortNames\\(\\))",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(dir C:\\\\Users\\\\AjayG\\\\Desktop\\\\testlcd *)",
+      "Skill(run)",
+      "Bash(echo \"Backend PID: $!\")",
+      "Bash(echo \"Frontend PID: $!\")",
+      "Bash(curl -s -X POST http://localhost:8000/api/qr/request -H 'Content-Type: application/json' -d '{\"deviceId\":\"esp32_node_01\"}')",
+      "Bash(curl -sv -X POST http://localhost:8000/api/qr/request -H 'Content-Type: application/json' -d '{\"deviceId\":\"esp32_node_01\"}')",
+      "Bash(pkill -f \"uvicorn main:app\")",
+      "Bash(curl *)",
+      "Bash(pkill -f \"uvicorn\")",
+      "Bash(python -m uvicorn main:app --port 8000)",
+      "Bash(pkill -f \"uvicorn\\\\|python.*main\")",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //PID 34992 //F)",
+      "Bash(taskkill //PID 13852 //F)",
+      "Bash(pkill -f \"vite\")",
+      "Bash(npm install *)",
+      "Bash(npm list *)",
+      "Bash(taskkill *)"
     ]
   }
 }

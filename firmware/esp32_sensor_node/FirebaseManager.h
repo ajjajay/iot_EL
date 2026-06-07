@@ -85,6 +85,10 @@ public:
     bool pollLatestSignIn(double lastSeenTs, char* outName, uint8_t nameLen,
                           bool& outSuccess, double& outTs);
 
+    // Write /devices/{deviceId}/commands/qrRequest = {pending:true}
+    // Called when the user triple-presses the QR button on the keypad.
+    void requestQrCode();
+
     bool isConnected() const { return _connected; }
 
 private:

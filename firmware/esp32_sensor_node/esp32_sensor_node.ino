@@ -84,6 +84,12 @@ bool enrollPending           = false;
 SensorReading lastEnvReading;
 MLResult      lastMlResult;
 
+// ── QR code triple-press state ────────────────────────────────────────────────
+uint8_t       qrPressCount   = 0;
+unsigned long qrFirstPressMs = 0;
+static constexpr uint8_t  QR_PRESS_TARGET = 3;
+static constexpr uint32_t QR_PRESS_WINDOW = 5000;  // ms
+
 // ── Dashboard sign-in tracking ────────────────────────────────────────────────
 double        lastSignInTs      = 0;
 unsigned long lastSignInPollMs  = 0;
@@ -461,9 +467,27 @@ void loop() {
             return;
         }
 
-        // Any keypad press → start PIN auth
+        // Keypad: '2' × 3 within 5 s → request QR code; any other key → PIN auth
         char key = keypad->getKey();
-        if (key != '\0') {
+        if (key == '2') {
+            if (qrPressCount == 0 || now - qrFirstPressMs > QR_PRESS_WINDOW) {
+                qrPressCount   = 1;
+                qrFirstPressMs = now;
+                lcd->showMessage("QR: press 2x", "more for QR");
+            } else {
+                qrPressCount++;
+                if (qrPressCount >= QR_PRESS_TARGET) {
+                    qrPressCount = 0;
+                    Serial.println("[KPD] Triple-press detected — requesting QR code");
+                    lcd->showMessage("QR requested", "Check email");
+                    firebase->requestQrCode();
+                } else {
+                    lcd->showMessage("QR: press 1x", "more for QR");
+                }
+            }
+            return;
+        } else if (key != '\0') {
+            qrPressCount = 0;
             Serial.printf("[KPD] Key '%c' pressed — starting PIN auth\n", key);
             fsm.transition(DeviceState::AUTHENTICATING);
             return;
