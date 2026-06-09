@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Iris Biometric Access Control -- IoT Design Methodology Report</title>
+<style>
+/* ═══ RESET ═══ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ═══ PRINT PAGE SETUP ═══ */
+@page {
+  size: A4;
+  margin: 2.2cm 2.5cm 2.6cm 2.5cm;
+  @bottom-center {
+    content: counter(page);
+    font-family: "Times New Roman", Times, serif;
+    font-size: 9pt;
+    color: #333;
+  }
+}
+@page :first { margin-top: 0; margin-bottom: 0; }
+
+/* ═══ BASE ═══ */
+body {
+  font-family: "Times New Roman", Times, serif;
+  font-size: 11pt;
+  color: #000;
+  background: #fff;
+  counter-reset: page 0;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ═══ SCREEN SIMULATION (white sheets on grey) ═══ */
+@media screen {
+  body { background: #d0d0d0; }
+  .page {
+    background: #fff;
+    width: 21cm;
+    min-height: 29.7cm;
+    margin: 1.2cm auto;
+    padding: 2.2cm 2.5cm 2.6cm 2.5cm;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.25);
+    position: relative;
+  }
+  .cover.page { padding-top: 0; }
+}
+
+/* ═══ PRINT PAGE ═══ */
+@media print {
+  .page { width: 100%; }
+  .page-break { page-break-after: always; break-after: page; }
+  h2 { page-break-after: avoid; break-after: avoid; }
+  h3 { page-break-after: avoid; break-after: avoid; }
+  pre { page-break-inside: avoid; break-inside: avoid; }
+  table { page-break-inside: avoid; break-inside: avoid; }
+  figure { page-break-inside: avoid; break-inside: avoid; }
+  a { color: inherit; text-decoration: none; }
+}
+.page-break { page-break-after: always; break-after: page; }
+figure { break-inside: avoid; page-break-inside: avoid; }
+
+/* ═══ COVER PAGE ═══ */
+.cover {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 5.5cm;
+  text-align: center;
+  min-height: 25cm;
+}
+.cover h1 { font-size: 24pt; font-weight: bold; margin-bottom: 0.3cm; }
+.cover .subtitle { font-size: 13pt; font-weight: normal; margin-bottom: 0.75cm; }
+.cover .rule { display: block; width: 100%; border: none; border-top: 1.5px solid #000; margin: 0 0 0.75cm 0; }
+.cover .meta { font-size: 11pt; line-height: 1.95; }
+.cover .prepared { font-style: italic; font-size: 10.5pt; margin-top: 1.6cm; color: #222; }
+
+/* ═══ RUNNING HEADER (body pages) ═══ */
+.rh {
+  font-style: italic;
+  font-size: 9.5pt;
+  color: #222;
+  border-top: 1px solid #000;
+  padding-top: 5px;
+  margin-bottom: 0.6cm;
+}
+
+/* ═══ SECTION HEADINGS ═══ */
+h2 {
+  font-size: 13.5pt;
+  font-weight: bold;
+  border-bottom: 1.5px solid #000;
+  padding-bottom: 4px;
+  margin-top: 0.45cm;
+  margin-bottom: 0.4cm;
+}
+h3 {
+  font-size: 11pt;
+  font-weight: bold;
+  margin-top: 0.38cm;
+  margin-bottom: 0.14cm;
+}
+
+/* ═══ BODY TEXT ═══ */
+p { text-align: justify; line-height: 1.48; margin-bottom: 0.3cm; }
+
+/* ═══ DASH LISTS ═══ */
+ul.dash { list-style: none; padding-left: 0; margin-bottom: 0.3cm; }
+ul.dash li {
+  text-align: justify;
+  line-height: 1.48;
+  padding-left: 0.95cm;
+  text-indent: -0.48cm;
+  margin-bottom: 0.08cm;
+}
+ul.dash li::before { content: "- "; }
+
+/* ═══ CODE BLOCKS ═══ */
+pre {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 7.8pt;
+  background: #ededff;
+  padding: 0.32cm 0.42cm;
+  margin-bottom: 0.32cm;
+  white-space: pre;
+  overflow-x: auto;
+  line-height: 1.38;
+  border-left: 3px solid #8888cc;
+}
+@media print {
+  pre { white-space: pre-wrap; word-break: break-all; overflow-x: visible; }
+}
+code {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 9pt;
+  background: #f0f0ff;
+  padding: 1px 3px;
+  border-radius: 2px;
+}
+
+/* ═══ TABLES ═══ */
+table { width: 100%; border-collapse: collapse; margin-bottom: 0.32cm; font-size: 10pt; }
+thead tr { background: #1a1a1a; color: #fff; }
+thead th { text-align: left; padding: 5px 8px; font-weight: bold; font-size: 9.5pt; }
+tbody tr:nth-child(even) { background: #f3f3f3; }
+tbody td { padding: 3px 8px; border-bottom: 1px solid #ccc; font-size: 9.5pt; vertical-align: top; }
+
+/* ═══ FIGURES ═══ */
+figure { margin: 0.4cm 0 0.5cm 0; text-align: center; }
+figcaption { font-style: italic; font-size: 9.5pt; text-align: center; margin-top: 0.2cm; color: #333; }
+
+/* ═══ PRINT-ONLY PAGE NUMBER (screen fallback) ═══ */
+@media screen {
+  .pg { text-align: center; font-size: 9pt; color: #888; padding-top: 0.4cm; }
+}
+@media print { .pg { display: none; } }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════ COVER PAGE ══════════════════ -->
+<div class="cover page page-break">
+  <h1>Iris Biometric Access Control</h1>
+  <div class="subtitle">IoT Design Methodology Report</div>
+  <span class="rule"></span>
+  <div class="meta">
+    Platform:&nbsp;&nbsp;ESP32-CAM (AI Thinker) &nbsp;|&nbsp; IoT Lab CIE<br>
+    Cloud:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Firebase Realtime Database &amp; AWS IoT Core<br>
+    Frontend:&nbsp;&nbsp;Web Dashboard &nbsp;(frontend/index.html + app.js)<br>
+    Firmware:&nbsp;&nbsp;ESP32 Arduino C++ &nbsp;(Arduino IDE 2.x / GCC)<br>
+    AI/Alert:&nbsp;&nbsp;AWS Lambda + Bedrock Agent + SNS
+  </div>
+  <div class="prepared">Prepared following IoT Design Methodology -- Bahga &amp; Madisetti, Chapter 5</div>
+</div>
+
+<!-- ══════════════════ STEP 1 ══════════════════ -->
+<div class="page page-break">
+<div class="rh">Iris Biometric Access Control &nbsp;--&nbsp; IoT Design Methodology Report</div>
+
+<h2>Step 1: Purpose &amp; Requirements Specification</h2>
+
+<p>The Iris Biometric Access Control System provides production-grade physical security through on-device
+iris recognition on ESP32-CAM nodes. Each node captures iris images via an OV2640 camera, extracts a
+64-element zonal feature descriptor, and matches it against enrolled templates stored in SPIFFS -- granting
+or denying door access without cloud round-trip latency. Biometric events and anomaly alerts are published
+to both Firebase Realtime Database and AWS IoT Core for remote monitoring and AI-driven notification.</p>
+
+<h3>Requirements</h3>
+<ul class="dash">
+  <li>Data Collection: OV2640 camera captures 160&times;120 grayscale frames; <code>_extractFeatures()</code>
+      divides each frame into an 8&times;8 grid and stores the mean pixel intensity of each cell as float32,
+      producing a 64-element descriptor per frame.</li>
+  <li>Biometric Matching: BiometricManager computes normalised RMS distance between the query descriptor and
+      every stored template; the closest match below <code>irisMatchThreshold</code> (default 0.30)
+      authenticates the user.</li>
+  <li>Enrollment: <code>captureAverage()</code> accumulates 5 valid frames and averages them; template written
+      to SPIFFS at <code>/bio/{userId}_t{N}.bin</code>; up to 5 templates per user with ring-buffer
+      overwrite.</li>
+  <li>Anomaly Detection: AnomalyDetector maintains a 20-event sliding window; composite score
+      (0.40 &times; failure_rate + 0.35 &times; score_proximity + 0.25 &times; frequency_spike)
+      triggers AlertManager when &ge; <code>anomalyScoreThreshold</code> (default 0.60).</li>
+  <li>Environmental Sensing: DHT22 measures temperature and humidity with 3-attempt retry and EMA smoothing
+      (&alpha;&nbsp;=&nbsp;0.3); LDR measures ambient light normalised to [0,&nbsp;1] via
+      <code>analogRead()/4095.0</code>.</li>
+  <li>TinyML Inference: TFLite Micro model (Dense 16&rarr;8&rarr;3 Softmax, ~4.2&nbsp;KB) classifies ambient
+      environmental risk; <code>riskScore &ge; mlRiskThreshold</code> triggers ALERT state independently of
+      biometrics.</li>
+  <li>Actuation: Relay controls door lock; status LED encodes FSM state via blink patterns; manual override
+      auto-expires after 5 minutes to prevent stuck-open doors.</li>
+  <li>Data Transmission: Firebase_ESP_Client library pushes sign-in events, enrollment records, sensor
+      readings, and alerts to Firebase RTDB over HTTPS; 30-entry offline ring buffer prevents data loss
+      during WiFi outages.</li>
+  <li>Cloud Telemetry: AWSIoTManager publishes biometric events and anomaly alerts over MQTT/TLS to AWS IoT
+      Core on port 8883; subscribes to Bedrock Agent ACK topic.</li>
+  <li>Cloud AI: AWS IoT Rules route biometric/alert MQTT messages to BiometricAlertAgent Lambda &rarr;
+      Bedrock Agent &rarr; SNS notification; ACK published back to device to close the feedback loop.</li>
+  <li>User Interface: Web dashboard (frontend/) displays live sign-in logs, enrolled users, security alerts,
+      ambient sensor charts, and relay override controls via Firebase JS SDK <code>onValue()</code>
+      WebSocket listeners.</li>
+  <li>Alert Management: Duplicate suppression within <code>alertCooldownMs</code> (30&nbsp;000&nbsp;ms);
+      dual dispatch to Firebase <code>/alerts/{id}</code> and AWS IoT; dashboard shows acknowledged
+      flag.</li>
+  <li>Security: Per-device Firebase Email/Password authentication; AWS IoT X.509 certificate and private
+      key in <code>aws_certificates.h</code>; Firebase security rules enforce <code>auth.uid</code>
+      path matching for all reads and writes.</li>
+  <li>Configuration: Per-device <code>config.json</code> in SPIFFS; all thresholds, pin assignments, and
+      credentials are overridable without reflashing; remote threshold override via Firebase
+      <code>/devices/{id}/config</code>.</li>
+</ul>
+<div class="pg">2</div>
+</div>
+
+<!-- ══════════════════ STEP 2 ══════════════════ -->
+<div class="page page-break">
+<div class="rh">Iris Biometric Access Control &nbsp;--&nbsp; IoT Design Methodology Report</div>
+
+<h2>Step 2: Process Specification</h2>
+<p>Use cases derived from requirements, covering all major system interactions.</p>
+
+<h3>UC1 -- Authenticate User (button-triggered flow)</h3>
+<p>Actor: Door User &nbsp;|&nbsp; Trigger: Short press on <code>authButtonPin</code> (GPIO15)</p>
+<p>Steps: Button press &rarr; transition(AUTHENTICATING) &rarr; <code>captureAverage(5,&nbsp;200ms)</code><br>
+&nbsp;&nbsp;&rarr; BiometricManager.match(query) &rarr; score &lt; threshold &rarr; transition(AUTHENTICATED)<br>
+&nbsp;&nbsp;&rarr; ActuatorController.setRelay(ON) &rarr; delay <code>authDisplayMs</code> (3000&nbsp;ms) &rarr; relay OFF &rarr; MONITORING.</p>
+
+<h3>UC2 -- Enroll New User (dashboard-triggered)</h3>
+<p>Actor: Admin (browser) &nbsp;|&nbsp; Trigger: Dashboard writes <code>/devices/{id}/commands/enroll/pending&nbsp;=&nbsp;true</code></p>
+<p>Steps: FirebaseManager.pollEnrollCommand() reads pending flag every 5&nbsp;s &rarr; transition(ENROLLING)<br>
+&nbsp;&nbsp;&rarr; <code>captureAverage(5,&nbsp;200ms)</code> &rarr; BiometricManager.enroll(userId, name, capture)<br>
+&nbsp;&nbsp;&rarr; template written to SPIFFS &rarr; pushEnrollment() &rarr; Firebase <code>/users/{userId}</code> &rarr; pending cleared.</p>
+
+<h3>UC3 -- Anomaly Alert (brute force / spoofing)</h3>
+<p>Actor: System &nbsp;|&nbsp; Trigger: AnomalyDetector composite score &ge; 0.60</p>
+<p>Steps: record(result,&nbsp;success) &rarr; composite &ge; threshold &rarr; AlertManager.dispatchAlert()<br>
+&nbsp;&nbsp;&rarr; publishAlertJson() to AWS <code>iot/{thing}/biometric/alert</code> &rarr; IoT Rule fires<br>
+&nbsp;&nbsp;&rarr; Lambda BiometricAlertAgent &rarr; Bedrock Agent &rarr; SNS &rarr; user notified<br>
+&nbsp;&nbsp;&rarr; Firebase <code>/alerts/{id}</code> pushed &rarr; device polls <code>getAgentAck()</code>.</p>
+
+<h3>UC4 -- Failed Authentication</h3>
+<p>Actor: Door User &nbsp;|&nbsp; Trigger: match score &gt; <code>irisMatchThreshold</code> (0.30)</p>
+<p>Steps: BiometricManager.match() returns no winner &rarr; transition(REJECTED)<br>
+&nbsp;&nbsp;&rarr; relay stays OFF &rarr; LED 3 fast flashes &rarr; AnomalyDetector.record(result, false)<br>
+&nbsp;&nbsp;&rarr; FirebaseManager.pushSignIn(false) &rarr; transition(MONITORING).</p>
+
+<h3>UC5 -- Environmental Risk Alert</h3>
+<p>Actor: System &nbsp;|&nbsp; Trigger: MLInference <code>riskScore &ge; mlRiskThreshold</code></p>
+<p>Steps: SensorManager.read() &rarr; MLInference.predict(temp, hum, light) &rarr; riskScore elevated<br>
+&nbsp;&nbsp;&rarr; transition(ALERT) &rarr; relay ON &rarr; fast LED blink<br>
+&nbsp;&nbsp;&rarr; FirebaseManager.pushAlert("env_threshold") &rarr; risk clears on cooldown &rarr; MONITORING.</p>
+
+<h3>UC6 -- Manual Relay Override (dashboard)</h3>
+<p>Actor: Admin (browser) &nbsp;|&nbsp; Trigger: Dashboard writes <code>/commands/relayOverride&nbsp;=&nbsp;"ON"/"OFF"</code></p>
+<p>Steps: FirebaseManager reads command &rarr; ActuatorController.applyOverride(state)<br>
+&nbsp;&nbsp;&rarr; relay / LED state changes &rarr; 5-minute auto-expiry timer starts<br>
+&nbsp;&nbsp;&rarr; override cleared on expiry &rarr; ActuatorController reverts to AUTO mode.</p>
+<div class="pg">3</div>
+</div>
+
+<!-- ══════════════════ STEP 3 ══════════════════ -->
+<div class="page page-break">
+<div class="rh">Iris Biometric Access Control &nbsp;--&nbsp; IoT Design Methodology Report</div>
+
+<h2>Step 3: Domain Model Specification</h2>
+
+<h3>Physical Entities</h3>
+<ul class="dash">
+  <li>ESP32-CAM (AI Thinker): Xtensa LX6 dual-core 240&nbsp;MHz, 3.3&nbsp;V, 4&nbsp;MB Flash, 520&nbsp;KB SRAM, 4&nbsp;MB PSRAM</li>
+  <li>OV2640 camera module: fixed-focus; connected via default AI Thinker 15-pin ribbon cable; 160&times;120 grayscale JPEG decoded on-chip</li>
+  <li>DHT22 on <code>dhtPin</code> (default GPIO4): temperature (&minus;40--80&nbsp;&deg;C) and humidity (0--100&nbsp;%) with 3-attempt retry and EMA smoothing (&alpha;&nbsp;=&nbsp;0.3)</li>
+  <li>LDR on <code>ldrPin</code> (default GPIO34, ADC1): ambient light reading normalised to [0,&nbsp;1] via <code>analogRead()/4095.0</code></li>
+  <li>Relay module on <code>relayPin</code> (default GPIO26): energises to release door latch; optocoupler-isolated 5&nbsp;V circuit</li>
+  <li>Status LED on <code>ledPin</code> (default GPIO2): blink pattern encodes FSM state (slow blink&nbsp;= idle, fast blink&nbsp;= active/alert, SOS&nbsp;= error)</li>
+  <li>Momentary push button on <code>authButtonPin</code> (default GPIO15): active-low with internal pull-up; short press triggers AUTHENTICATING</li>
+</ul>
+
+<h3>Virtual Entities</h3>
+<ul class="dash">
+  <li>Firebase Realtime Database -- <code>/devices</code>, <code>/signins</code>, <code>/users</code>, <code>/alerts</code>, <code>/readings</code> paths</li>
+  <li>AWS IoT Core -- MQTT/TLS broker with IoT Rules, Lambda BiometricAlertAgent, Bedrock Agent, SNS</li>
+  <li>Web Dashboard -- HTML/JS SPA (<code>frontend/index.html</code> + <code>frontend/app.js</code>)</li>
+</ul>
+
+<h3>IrisCapture struct (firmware object)</h3>
+<pre>struct IrisCapture {
+    float         features[64];   // 8x8 zonal mean intensity, normalised [0,1]
+    bool          valid;
+    unsigned long timestampMs;
+};</pre>
+
+<h3>MatchResult struct (firmware object)</h3>
+<pre>struct MatchResult {
+    bool    matched;
+    String  userId;
+    String  userName;
+    float   score;        // normalised RMS distance -- lower = better
+    int     templateIdx;  // index of winning template (0-4)
+};</pre>
+
+<h3>Relationships</h3>
+<ul class="dash">
+  <li>OV2640 &rarr; IrisCamera.capture() &rarr; <code>_extractFeatures()</code> &rarr; IrisCapture.features[64]</li>
+  <li>BiometricManager.match(IrisCapture) &rarr; normalised RMS vs. every SPIFFS template &rarr; MatchResult</li>
+  <li>AnomalyDetector.record(MatchResult, success) &rarr; composite score &rarr; AlertManager if score &ge; threshold</li>
+  <li>SensorManager.read() &rarr; MLInference.predict() &rarr; riskScore &rarr; StateManager.transition(ALERT) if high</li>
+  <li>FirebaseManager.pollEnrollCommand() &rarr; triggers ENROLLING &rarr; BiometricManager.enroll() &rarr; SPIFFS + Firebase</li>
+  <li>ActuatorController.tick() &rarr; respects StateManager.getState() and override expiry timer</li>
+</ul>
+<div class="pg">4</div>
+</div>
+
+<!-- ══════════════════ STEP 4 ══════════════════ -->
+<div class="page page-break">
+<div class="rh">Iris Biometric Access Control &nbsp;--&nbsp; IoT Design Methodology Report</div>
+
+<h2>Step 4: Information Model Specification</h2>
+
+<h3>Firebase Sign-in Event (JSON, pushed to /signins/{deviceId}/{pushId})</h3>
+<pre>{
+  "userId":       "user_001",          // enrolled user ID or "unknown"
+  "userName":     "Alice Sharma",      // full name from enrollment record
+  "deviceId":     "esp32_node_01",     // originating ESP32-CAM node
+  "matchScore":   0.18,                // normalised RMS distance (lower = better)
+  "success":      true,                // authentication outcome
+  "anomalyScore": 0.12,                // composite anomaly score at event time
+  "ts":           1749456000000        // JS millis timestamp (server-set)
+}</pre>
+
+<h3>AWS IoT MQTT Biometric Alert Payload (JSON)</h3>
+<pre>{
+  "deviceId":     "esp32_node_01",
+  "alertType":    "brute_force",       // "brute_force" | "suspicious_score" | "env_threshold"
+  "userId":       "unknown",
+  "anomalyScore": 0.74,
+  "riskScore":    0.0,                 // populated for env_threshold alerts
+  "ts":           1749456000000
+}</pre>
+
+<h3>Firebase RTDB Field Mapping -- /signins/{deviceId}/{pushId}</h3>
+<table>
+  <thead><tr><th>Field</th><th>Description</th><th>Type</th><th>Range / Values</th></tr></thead>
+  <tbody>
+    <tr><td>userId</td><td>Authenticated user ID or "unknown"</td><td>string</td><td>--</td></tr>
+    <tr><td>userName</td><td>Full name from enrollment record</td><td>string</td><td>--</td></tr>
+    <tr><td>deviceId</td><td>Originating ESP32-CAM node ID</td><td>string</td><td>--</td></tr>
+    <tr><td>matchScore</td><td>Normalised RMS iris distance</td><td>float</td><td>0.0 -- 1.0</td></tr>
+    <tr><td>success</td><td>Authentication outcome</td><td>bool</td><td>true / false</td></tr>
+    <tr><td>anomalyScore</td><td>Composite anomaly score at event time</td><td>float</td><td>0.0 -- 1.0</td></tr>
+    <tr><td>ts</td><td>Event timestamp (JS millis, server-set)</td><td>number</td><td>epoch ms</td></tr>
+  </tbody>
+</table>
+
+<h3>Firebase RTDB Field Mapping -- /devices/{id}/latest</h3>
+<table>
+  <thead><tr><th>Field</th><th>Description</th><th>Type</th><th>Range / Values</th></tr></thead>
+  <tbody>
+    <tr><td>temperatureC</td><td>DHT22 temperature reading</td><td>float</td><td>&minus;40 -- 80</td></tr>
+    <tr><td>humidityPct</td><td>DHT22 relative humidity</td><td>float</td><td>0 -- 100</td></tr>
+    <tr><td>lightRaw</td><td>Raw ADC reading from LDR</td><td>int</td><td>0 -- 4095</td></tr>
+    <tr><td>lightNorm</td><td>Normalised ambient light level</td><td>float</td><td>0.0 -- 1.0</td></tr>
+    <tr><td>riskScore</td><td>TFLite Micro ambient risk score</td><td>float</td><td>0.0 -- 1.0</td></tr>
+    <tr><td>mlLabel</td><td>Risk classification label</td><td>int</td><td>0=normal, 1=warning, 2=critical</td></tr>
+    <tr><td>state</td><td>Current FSM state name string</td><td>string</td><td>MONITORING, ALERT, etc.</td></tr>
+    <tr><td>ts</td><td>Ambient cycle timestamp</td><td>number</td><td>epoch ms</td></tr>
+  </tbody>
+</table>
+<div class="pg">5</div>
+</div>
+
+<!-- ══════════════════ STEP 5 ══════════════════ -->
+<div class="page page-break">
+<div class="rh">Iris Biometric Access Control &nbsp;--&nbsp; IoT Design Methodology Report</div>
+
+<h2>Step 5: Service Specifications</h2>
+
+<h3>Service 1 -- Firebase HTTPS Telemetry (ESP32 &rarr; Firebase RTDB)</h3>
+<ul class="dash">
+  <li>Library: Firebase_ESP_Client (mobizt); auth via per-device Email/Password loaded from config.json</li>
+  <li>Paths written: <code>/signins/{id}/{pushId}</code>, <code>/users/{userId}</code>, <code>/alerts/{id}/{pushId}</code>, <code>/devices/{id}/latest</code>, <code>/readings/{id}/{pushId}</code>, <code>/devices/{id}/heartbeat</code></li>
+  <li>Offline buffer: 30-entry ring buffer; entries flushed in order on WiFi restore</li>
+  <li>Heartbeat: heapFree, uptime, and FSM state name written each cycle; <code>online&nbsp;=&nbsp;true</code> set on connect</li>
+  <li>Remote config: <code>/devices/{id}/config</code> thresholds applied to runtime parameters without reflash</li>
+</ul>
+
+<h3>Service 2 -- AWS IoT MQTT Telemetry (ESP32 &rarr; AWS IoT Core)</h3>
+<ul class="dash">
+  <li>Protocol: MQTT/TLS on port 8883 via PubSubClient library</li>
+  <li>Auth: X.509 device certificate + RSA private key stored in <code>aws_certificates.h</code></li>
+  <li>Topics published: <code>iot/{thing}/biometric/signin</code>, <code>iot/{thing}/biometric/alert</code></li>
+  <li>Topics subscribed: <code>iot/{thing}/commands</code>, <code>iot/{thing}/shadow/delta</code>, <code>iot/{thing}/ai/alerts</code> (Bedrock ACK)</li>
+  <li>Reconnect: auto-reconnect loop in <code>AWSIoTManager.loop()</code> called each main-loop iteration</li>
+</ul>
+
+<h3>Service 3 -- AWS Bedrock Agent Notification Pipeline</h3>
+<ul class="dash">
+  <li>Trigger: IoT Rule -- <code>SELECT * FROM 'iot/+/biometric/alert'</code></li>
+  <li>Lambda: BiometricAlertAgent receives alert JSON &rarr; invokes Amazon Bedrock Agent session with anomaly context</li>
+  <li>Bedrock Agent: analyses alertType + anomalyScore &rarr; generates natural-language summary &rarr; routes to SNS</li>
+  <li>ACK: Bedrock publishes confirmation JSON to <code>iot/{thing}/ai/alerts</code>; <code>AWSIoTManager.getAgentAck()</code> returns true on receipt</li>
+  <li>Cooldown: AlertManager suppresses duplicate alerts of the same type within <code>alertCooldownMs</code> (30&nbsp;000&nbsp;ms)</li>
+</ul>
+
+<h3>Service 4 -- Firebase Command Polling (Dashboard &rarr; ESP32)</h3>
+<ul class="dash">
+  <li>Enrollment: FirebaseManager reads <code>/devices/{id}/commands/enroll/pending</code> every 5&nbsp;s; device clears flag after reading</li>
+  <li>Relay override: <code>/devices/{id}/commands/relayOverride</code> ("ON"/"OFF"/"AUTO") read each main-loop iteration</li>
+  <li>Remote thresholds: <code>/devices/{id}/config</code> subtree polled and applied to runtime parameters</li>
+  <li>Response latency: 5&nbsp;s maximum for enrollment; relay override &lt;&nbsp;1&nbsp;s (polled every loop tick)</li>
+</ul>
+
+<h3>Service 5 -- Web Dashboard (Browser &harr; Firebase RTDB)</h3>
+<ul class="dash">
+  <li>SDK: Firebase JS SDK v9 (modular); persistent <code>onValue()</code> WebSocket listeners</li>
+  <li>Sign-in log: <code>limitToLast(50)</code> on <code>/signins/{id}</code>; rows colour-coded by success / anomaly score</li>
+  <li>Enrolled users panel: <code>onValue(/users)</code> drives management table; enroll command writes to <code>/commands/enroll</code></li>
+  <li>Sensor charts: ambient readings from <code>/readings/{id}</code> plotted as live time-series (temperature, humidity, light, riskScore)</li>
+  <li>Relay override: dashboard writes <code>/commands/relayOverride</code>; 5-minute countdown displayed client-side</li>
+</ul>
+<div class="pg">6</div>
+</div>
+
+<!-- ══════════════════ STEP 6 ══════════════════ -->
+<div class="page page-break">
+<div class="rh">Iris Biometric Access Control &nbsp;--&nbsp; IoT Design Methodology Report</div>
+
+<h2>Step 6: IoT Level Specification</h2>
+
+<p>This system is classified as <strong>IoT Level 5</strong> (Bahga &amp; Madisetti taxonomy).</p>
+<ul class="dash">
+  <li>Multiple end-devices (ESP32-CAM nodes, &times;N) each perform local sensing, biometric inference, anomaly scoring, and JSON serialisation independently -- no coordinator required for authentication decisions.</li>
+  <li>Each device maintains its own enrolled template store in SPIFFS; match latency is sub-second and tolerates full cloud outage.</li>
+  <li>Dual cloud layers: Firebase RTDB provides low-latency WebSocket-accessible telemetry storage; AWS IoT Core routes alerts through a rules-engine pipeline to an AI agent.</li>
+  <li>Cloud AI processing layer: Lambda + Bedrock Agent analyses anomaly context and generates natural-language SNS notifications -- analysis is split between device (AnomalyDetector composite scorer) and cloud (Bedrock semantic reasoning).</li>
+  <li>Feedback loop closes at the device: Bedrock ACK is subscribed via MQTT and consumed by <code>AWSIoTManager.getAgentAck()</code>, allowing the device to confirm the alert was actioned before clearing its alert state.</li>
+  <li>Separate visualisation application (HTML/JS SPA) consumes Firebase data via persistent WebSocket; updates are pushed sub-second regardless of any cloud polling interval.</li>
+  <li>TinyML secondary inference on-device (TFLite Micro ambient risk classifier) adds a Level 5 enhancement: edge intelligence reduces false-positive environmental alerts before telemetry is transmitted, lowering cloud traffic and SNS noise.</li>
+</ul>
+<p>Level 5 characteristics: multiple independent sensing nodes, dual cloud back-ends with AI processing,
+bidirectional cloud-to-device feedback, and a separate visualisation application. The absence of a dedicated
+coordinator node is compensated by each ESP32-CAM operating as a self-contained authentication unit that
+independently reports to shared Firebase paths. The on-device TinyML ambient classifier pre-classifies
+environmental risk before transmitting, reducing raw sensor data volume and enabling context-aware alerting
+without cloud inference latency.</p>
+<div class="pg">7</div>
+</div>
+
+<!-- ══════════════════ STEP 7 ══════════════════ -->
+<div class="page page-break">
+<div class="rh">Iris Biometric Access Control &nbsp;--&nbsp; IoT Design Methodology Report</div>
+
+<h2>Step 7: Functional View Specification</h2>
+<p>IoT Level 5 functional groups mapped to concrete system components.</p>
+
+<h3>1. Sensing</h3>
+<ul class="dash">
+  <li>OV2640 &rarr; IrisCamera.capture() &rarr; <code>_extractFeatures()</code> &rarr; float[64] zonal descriptor per frame</li>
+  <li>DHT22 &rarr; SensorManager.read() with 3-attempt retry; EMA smoothing (&alpha;&nbsp;=&nbsp;0.3) on temperature and humidity</li>
+  <li>LDR &rarr; <code>analogRead(ldrPin)</code> &rarr; <code>lightNorm&nbsp;= raw/4095.0f</code>; stored in SensorData struct</li>
+  <li>Push button &rarr; debounced <code>digitalRead(authButtonPin)&nbsp;==&nbsp;LOW</code> &rarr; triggers AUTHENTICATING</li>
+</ul>
+
+<h3>2. Device Processing (ESP32-CAM firmware)</h3>
+<ul class="dash">
+  <li><code>captureAverage(N, delayMs)</code> accumulates N valid frames and returns their mean descriptor</li>
+  <li>BiometricManager.match() computes normalised RMS distance across all enrolled SPIFFS templates</li>
+  <li>AnomalyDetector.record() updates 20-event sliding window; returns composite score in [0.0, 1.0]</li>
+  <li>MLInference.predict(temp, hum, light) runs TFLite Micro forward pass; returns riskScore + mlLabel (0/1/2)</li>
+  <li>StateManager.transition() enforces legal transition table; logs elapsed time in previous state to Serial</li>
+</ul>
+
+<h3>3. Communication (Firebase + AWS IoT)</h3>
+<ul class="dash">
+  <li>FirebaseManager: HTTPS REST to Firebase RTDB via Firebase_ESP_Client; heartbeat, sign-ins, alerts, readings, and command polling</li>
+  <li>AWSIoTManager: MQTT/TLS via PubSubClient on port 8883; publishes biometric events and alerts; subscribes to ACK and shadow delta</li>
+</ul>
+
+<h3>4. Cloud Storage (Firebase RTDB)</h3>
+<ul class="dash">
+  <li><code>/devices/{id}/latest</code> -- overwritten each ambient cycle; WebSocket-delivered to dashboard in &lt;100&nbsp;ms</li>
+  <li><code>/signins/{id}/{pushId}</code> -- append-only sign-in history; <code>limitToLast(50)</code> used by dashboard</li>
+  <li><code>/users/{userId}</code> -- enrollment registry with active flag; writable from dashboard with auth</li>
+  <li><code>/alerts/{id}/{pushId}</code> -- biometric and environmental alerts with <code>acknowledged</code> boolean</li>
+</ul>
+
+<h3>5. Cloud AI Processing (AWS IoT Core pipeline)</h3>
+<ul class="dash">
+  <li>IoT Rule: <code>SELECT * FROM 'iot/+/biometric/alert'</code> &rarr; Lambda BiometricAlertAgent</li>
+  <li>Lambda: invokes Amazon Bedrock Agent with alert context (deviceId, alertType, anomalyScore, ts)</li>
+  <li>Bedrock Agent: generates natural-language summary &rarr; publishes to SNS (email/SMS)</li>
+  <li>ACK: Bedrock publishes confirmation to <code>iot/{thing}/ai/alerts</code>; consumed by <code>AWSIoTManager.getAgentAck()</code></li>
+</ul>
+
+<h3>6. Application / Visualisation (Web Dashboard)</h3>
+<ul class="dash">
+  <li><code>onValue()</code> listeners on <code>/devices</code>, <code>/signins</code>, <code>/users</code>, <code>/alerts</code> provide sub-second live updates</li>
+  <li>Sign-in log: matched/failed rows colour-coded; matchScore and anomalyScore displayed per event</li>
+  <li>Enrolled users panel: enroll command dispatch, active/inactive toggle, device selector</li>
+  <li>Device health table: uptime, heapFree, FSM state, online flag per node from <code>/devices/{id}/heartbeat</code></li>
+</ul>
+<div class="pg">8</div>
+</div>
+
+<!-- ══════════════════ STEP 8 ══════════════════ -->
+<div class="page page-break">
+<div class="rh">Iris Biometric Access Control &nbsp;--&nbsp; IoT Design Methodology Report</div>
+
+<h2>Step 8: Operational View Specification</h2>
+
+<h3>Communication</h3>
+<ul class="dash">
+  <li>ESP32-CAM WiFi (IEEE 802.11 b/g/n, 2.4&nbsp;GHz) &rarr; Firebase RTDB (HTTPS, port 443)</li>
+  <li>ESP32-CAM WiFi &rarr; AWS IoT Core endpoint (MQTT/TLS, port 8883)</li>
+  <li>Browser &rarr; Firebase RTDB (Firebase JS SDK persistent WebSocket connection)</li>
+  <li>AWS IoT Core &rarr; Lambda (internal VPC) &rarr; Bedrock API &rarr; SNS &rarr; Email/SMS (internet)</li>
+</ul>
+
+<h3>Service Hosting</h3>
+<ul class="dash">
+  <li>Firebase RTDB: Firebase Spark/Blaze tier; 100 simultaneous WebSocket connections; 1&nbsp;GB storage on Spark</li>
+  <li>AWS IoT Core: pay-per-message; IoT Rules, Lambda, Bedrock Agent, SNS deployed in us-east-1</li>
+  <li>Dashboard: static HTML/JS; served from local filesystem or any web server; no build step required</li>
+  <li>Firmware: compiled in Arduino IDE 2.x; partition scheme -- Huge APP (3&nbsp;MB app / 1&nbsp;MB SPIFFS)</li>
+</ul>
+
+<h3>Storage</h3>
+<ul class="dash">
+  <li>Device SPIFFS: biometric templates at <code>/bio/{userId}_t{N}.bin</code>; <code>/bio/users.json</code> registry; <code>config.json</code> thresholds</li>
+  <li>Firebase RTDB: unlimited append to <code>/signins</code>, <code>/readings</code>, <code>/alerts</code>; <code>/devices/{id}/latest</code> overwritten each cycle</li>
+  <li>AWS: Lambda logs in CloudWatch; Bedrock session logs optional; IoT messages not persisted by default</li>
+  <li>Browser: sign-in history and sensor data held in JS state for the session (non-persistent)</li>
+</ul>
+
+<h3>Network Topology</h3>
+<pre>ESP32-CAM(s) --[WiFi / HTTPS 443]--------&gt; Firebase RTDB
+ESP32-CAM(s) --[WiFi / MQTT-TLS 8883]---&gt; AWS IoT Core
+                                                 |
+                                          IoT Rules Engine
+                                                 |
+                                     Lambda (BiometricAlertAgent)
+                                                 |
+                                          Bedrock Agent
+                                                 |
+                                       SNS --&gt; User (Email / SMS)
+                                                 |
+                                   ACK MQTT --&gt; ESP32-CAM
+Firebase RTDB --[WebSocket]----------&gt; Browser Dashboard (JS SPA)</pre>
+<div class="pg">9</div>
+</div>
+
+<!-- ══════════════════ STEP 9 ══════════════════ -->
+<div class="page page-break">
+<div class="rh">Iris Biometric Access Control &nbsp;--&nbsp; IoT Design Methodology Report</div>
+
+<h2>Step 9: Device &amp; Component Integration</h2>
+
+<h3>Component List</h3>
+<ul class="dash">
+  <li>1&times; AI Thinker ESP32-CAM (Xtensa LX6 dual-core 240&nbsp;MHz, 3.3&nbsp;V, 4&nbsp;MB Flash, 4&nbsp;MB PSRAM)</li>
+  <li>1&times; OV2640 camera module (fixed-focus; default AI Thinker 15-pin ribbon connector)</li>
+  <li>1&times; DHT22 temperature and humidity sensor (GPIO4; 10&nbsp;k&Omega; pull-up to 3.3&nbsp;V)</li>
+  <li>1&times; LDR + 10&nbsp;k&Omega; resistor voltage divider (GPIO34, ADC1 channel 6)</li>
+  <li>1&times; 5&nbsp;V relay module with optocoupler (GPIO26; relay board handles 3.3&nbsp;V signal)</li>
+  <li>1&times; Status LED + 220&nbsp;&Omega; series resistor (GPIO2; on-board blue LED)</li>
+  <li>1&times; Momentary push button (GPIO15; active-low, internal pull-up enabled in firmware)</li>
+  <li>1&times; FTDI USB-UART adapter 3.3&nbsp;V (TX&rarr;GPIO3/RX, RX&rarr;GPIO1/TX; IO0&rarr;GND for flash mode)</li>
+  <li>Host PC: Arduino IDE 2.x with ESP32 board package; Python 3.9+ for optional TinyML training</li>
+</ul>
+
+<!-- ── DIAGRAM 1: ESP32-CAM PINOUT ── -->
+<h3>ESP32-CAM Module Pinout</h3>
+<figure>
+<svg viewBox="0 0 680 440" xmlns="http://www.w3.org/2000/svg"
+     style="width:100%;max-width:680px;font-family:Arial,Helvetica,sans-serif;">
+
+  <!-- ── PCB body ── -->
+  <rect x="210" y="25" width="260" height="375" rx="8" ry="8"
+        fill="#1e5c1e" stroke="#0d3a0d" stroke-width="2.5"/>
+
+  <!-- Board label -->
+  <text x="340" y="58" text-anchor="middle" fill="#ffffff"
+        font-size="14" font-weight="bold">ESP32-CAM</text>
+  <text x="340" y="76" text-anchor="middle" fill="#aaddaa"
+        font-size="10">(AI Thinker Module)</text>
+
+  <!-- WiFi antenna area -->
+  <rect x="260" y="32" width="160" height="30" rx="4"
+        fill="none" stroke="#4a8a4a" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="340" y="51" text-anchor="middle" fill="#88bb88" font-size="8.5">WiFi / BT Antenna</text>
+
+  <!-- ESP32 SoC chip -->
+  <rect x="248" y="105" width="184" height="90" rx="4"
+        fill="#2a2a2a" stroke="#555" stroke-width="1"/>
+  <text x="340" y="146" text-anchor="middle" fill="#cccccc"
+        font-size="12" font-weight="bold">ESP32-S</text>
+  <text x="340" y="162" text-anchor="middle" fill="#aaaaaa" font-size="9">Xtensa LX6  240 MHz</text>
+  <text x="340" y="176" text-anchor="middle" fill="#aaaaaa" font-size="9">4 MB Flash  |  4 MB PSRAM</text>
+
+  <!-- OV2640 camera area -->
+  <rect x="245" y="290" width="190" height="90" rx="5"
+        fill="#163916" stroke="#4a7a4a" stroke-width="1"/>
+  <text x="340" y="322" text-anchor="middle" fill="#99cc99"
+        font-size="11" font-weight="bold">OV2640 Camera</text>
+  <text x="340" y="338" text-anchor="middle" fill="#88bb88" font-size="9">160 × 120 Grayscale</text>
+  <text x="340" y="352" text-anchor="middle" fill="#88bb88" font-size="9">15-pin ribbon connector</text>
+  <text x="340" y="366" text-anchor="middle" fill="#77aa77" font-size="8">JPEG decoded on-chip</text>
+
+  <!-- ══ LEFT SIDE PINS (J3) ══  -->
+  <!-- Helper: pin line x=210 back to x=70; dot at x=210 -->
+  <!-- y positions: 100, 142, 184, 226, 268 (skip camera area) -->
+  <!-- Using 5 accessible left-side pins for clarity -->
+
+  <!-- L1: 5V  -->
+  <line x1="70" y1="100" x2="210" y2="100" stroke="#cc2222" stroke-width="2"/>
+  <circle cx="210" cy="100" r="4.5" fill="#cc2222"/>
+  <text x="202" y="96" text-anchor="end" fill="#111"
+        font-size="10" font-weight="bold">5V</text>
+  <rect x="5"  y="90"  width="58" height="19" rx="3" fill="#cc2222"/>
+  <text x="34" y="103" text-anchor="middle" fill="#fff"
+        font-size="8.5" font-weight="bold">POWER</text>
+
+  <!-- L2: GND  -->
+  <line x1="70" y1="142" x2="210" y2="142" stroke="#333" stroke-width="2"/>
+  <circle cx="210" cy="142" r="4.5" fill="#333"/>
+  <text x="202" y="138" text-anchor="end" fill="#111"
+        font-size="10" font-weight="bold">GND</text>
+  <rect x="5"  y="132" width="58" height="19" rx="3" fill="#333"/>
+  <text x="34" y="145" text-anchor="middle" fill="#fff" font-size="8.5">GROUND</text>
+
+  <!-- L3: IO15 → BUTTON (used) -->
+  <line x1="70" y1="184" x2="210" y2="184" stroke="#0a7a0a" stroke-width="2.5"/>
+  <circle cx="210" cy="184" r="5.5" fill="#0a7a0a"/>
+  <text x="202" y="180" text-anchor="end" fill="#111"
+        font-size="10" font-weight="bold">IO15</text>
+  <rect x="3"  y="173" width="62" height="20" rx="3" fill="#0a7a0a"/>
+  <text x="34" y="186.5" text-anchor="middle" fill="#fff"
+        font-size="8" font-weight="bold">AUTH BUTTON</text>
+
+  <!-- L4: IO2 → LED (used) -->
+  <line x1="70" y1="226" x2="210" y2="226" stroke="#0a7a0a" stroke-width="2.5"/>
+  <circle cx="210" cy="226" r="5.5" fill="#0a7a0a"/>
+  <text x="202" y="222" text-anchor="end" fill="#111"
+        font-size="10" font-weight="bold">IO2</text>
+  <rect x="3"  y="215" width="62" height="20" rx="3" fill="#0a7a0a"/>
+  <text x="34" y="228.5" text-anchor="middle" fill="#fff"
+        font-size="8" font-weight="bold">STATUS LED</text>
+
+  <!-- L5: IO4 → DHT22 (used) -->
+  <line x1="70" y1="268" x2="210" y2="268" stroke="#0a7a0a" stroke-width="2.5"/>
+  <circle cx="210" cy="268" r="5.5" fill="#0a7a0a"/>
+  <text x="202" y="264" text-anchor="end" fill="#111"
+        font-size="10" font-weight="bold">IO4</text>
+  <rect x="3"  y="257" width="62" height="20" rx="3" fill="#0a7a0a"/>
+  <text x="34" y="270.5" text-anchor="middle" fill="#fff"
+        font-size="8" font-weight="bold">DHT22 DATA</text>
+
+  <!-- ══ RIGHT SIDE PINS (J1) ══ -->
+  <!-- pin line x=470 forward to x=610; dot at x=470 -->
+
+  <!-- R1: 3V3 -->
+  <line x1="470" y1="100" x2="610" y2="100" stroke="#cc2222" stroke-width="2"/>
+  <circle cx="470" cy="100" r="4.5" fill="#cc2222"/>
+  <text x="478" y="96" text-anchor="start" fill="#111"
+        font-size="10" font-weight="bold">3V3</text>
+  <rect x="617" y="90" width="58" height="19" rx="3" fill="#cc2222"/>
+  <text x="646" y="103" text-anchor="middle" fill="#fff"
+        font-size="8.5" font-weight="bold">POWER</text>
+
+  <!-- R2: IO16 / PSRAM -->
+  <line x1="470" y1="142" x2="610" y2="142" stroke="#cc7700" stroke-width="1.8"/>
+  <circle cx="470" cy="142" r="4"   fill="#cc7700"/>
+  <text x="478" y="138" text-anchor="start" fill="#444" font-size="10">IO16</text>
+  <rect x="617" y="132" width="58" height="19" rx="3" fill="#cc7700"/>
+  <text x="646" y="145" text-anchor="middle" fill="#fff" font-size="8.5">PSRAM</text>
+
+  <!-- R3: IO0 / BOOT -->
+  <line x1="470" y1="184" x2="610" y2="184" stroke="#cc7700" stroke-width="1.8"/>
+  <circle cx="470" cy="184" r="4"   fill="#cc7700"/>
+  <text x="478" y="180" text-anchor="start" fill="#444" font-size="10">IO0</text>
+  <rect x="617" y="173" width="58" height="20" rx="3" fill="#cc7700"/>
+  <text x="646" y="186.5" text-anchor="middle" fill="#fff" font-size="8">BOOT / FTDI</text>
+
+  <!-- R4: GND -->
+  <line x1="470" y1="226" x2="610" y2="226" stroke="#333" stroke-width="2"/>
+  <circle cx="470" cy="226" r="4.5" fill="#333"/>
+  <text x="478" y="222" text-anchor="start" fill="#111"
+        font-size="10" font-weight="bold">GND</text>
+  <rect x="617" y="216" width="58" height="19" rx="3" fill="#333"/>
+  <text x="646" y="229" text-anchor="middle" fill="#fff" font-size="8.5">GROUND</text>
+
+  <!-- R5: IO26 → RELAY (used) -->
+  <line x1="470" y1="268" x2="610" y2="268" stroke="#0a7a0a" stroke-width="2.5"/>
+  <circle cx="470" cy="268" r="5.5" fill="#0a7a0a"/>
+  <text x="478" y="264" text-anchor="start" fill="#111"
+        font-size="10" font-weight="bold">IO26</text>
+  <rect x="615" y="257" width="60" height="20" rx="3" fill="#0a7a0a"/>
+  <text x="645" y="270.5" text-anchor="middle" fill="#fff"
+        font-size="8" font-weight="bold">RELAY IN</text>
+
+  <!-- R6: IO34 → LDR ADC (used) -->
+  <line x1="470" y1="310" x2="610" y2="310" stroke="#1a4a9a" stroke-width="2.5"/>
+  <circle cx="470" cy="310" r="5.5" fill="#1a4a9a"/>
+  <text x="478" y="306" text-anchor="start" fill="#111"
+        font-size="10" font-weight="bold">IO34</text>
+  <rect x="613" y="299" width="62" height="20" rx="3" fill="#1a4a9a"/>
+  <text x="644" y="312.5" text-anchor="middle" fill="#fff"
+        font-size="8" font-weight="bold">LDR (ADC1)</text>
+
+  <!-- R7: VCC 5V -->
+  <line x1="470" y1="352" x2="610" y2="352" stroke="#cc2222" stroke-width="2"/>
+  <circle cx="470" cy="352" r="4.5" fill="#cc2222"/>
+  <text x="478" y="348" text-anchor="start" fill="#111"
+        font-size="10" font-weight="bold">VCC</text>
+  <rect x="617" y="342" width="58" height="19" rx="3" fill="#cc2222"/>
+  <text x="646" y="355" text-anchor="middle" fill="#fff"
+        font-size="8.5" font-weight="bold">5V INPUT</text>
+
+  <!-- ══ LEGEND ══ -->
+  <rect x="148" y="408" width="384" height="25" rx="4" fill="#f5f5f5" stroke="#ccc"/>
+  <circle cx="168" cy="420" r="5" fill="#0a7a0a"/>
+  <text x="178" y="424" fill="#222" font-size="9">Used (digital)</text>
+  <circle cx="255" cy="420" r="5" fill="#1a4a9a"/>
+  <text x="265" y="424" fill="#222" font-size="9">Used (ADC)</text>
+  <circle cx="332" cy="420" r="5" fill="#cc7700"/>
+  <text x="342" y="424" fill="#222" font-size="9">Special</text>
+  <circle cx="395" cy="420" r="5" fill="#cc2222"/>
+  <text x="405" y="424" fill="#222" font-size="9">Power</text>
+  <circle cx="450" cy="420" r="5" fill="#333"/>
+  <text x="460" y="424" fill="#222" font-size="9">Ground</text>
+</svg>
+<figcaption>Figure 1: ESP32-CAM (AI Thinker) module pinout -- project-used pins highlighted in green (digital) and blue (ADC)</figcaption>
+</figure>
+<div class="pg">10</div>
+</div>
+
+<!-- ── Step 9 continued: Wiring Diagram page ── -->
+<div class="page page-break">
+<div class="rh">Iris Biometric Access Control &nbsp;--&nbsp; IoT Design Methodology Report</div>
+
+<!-- ── DIAGRAM 2: PERIPHERAL WIRING ── -->
+<h3>Peripheral Wiring Diagram</h3>
+<figure>
+<svg viewBox="0 0 700 520" xmlns="http://www.w3.org/2000/svg"
+     style="width:100%;max-width:700px;font-family:Arial,Helvetica,sans-serif;">
+
+  <!-- ══ ESP32-CAM Centre Block ══ -->
+  <rect x="270" y="20" width="160" height="480" rx="8"
+        fill="#1e5c1e" stroke="#0d3a0d" stroke-width="2"/>
+  <text x="350" y="48" text-anchor="middle" fill="#fff"
+        font-size="12" font-weight="bold">ESP32-CAM</text>
+  <text x="350" y="64" text-anchor="middle" fill="#aaddaa" font-size="9">(AI Thinker)</text>
+
+  <!-- Left side GPIO labels on ESP32-CAM block -->
+  <text x="275" y="118" fill="#aaddaa" font-size="8.5">IO4</text>
+  <text x="275" y="148" fill="#ccccaa" font-size="8.5">3V3</text>
+  <text x="275" y="178" fill="#ccccaa" font-size="8.5">GND</text>
+  <text x="275" y="238" fill="#aaddaa" font-size="8.5">IO34</text>
+  <text x="275" y="268" fill="#ccccaa" font-size="8.5">3V3</text>
+  <text x="275" y="298" fill="#ccccaa" font-size="8.5">GND</text>
+  <text x="275" y="360" fill="#aaddaa" font-size="8.5">IO26</text>
+  <text x="275" y="390" fill="#ccccaa" font-size="8.5">VCC</text>
+  <text x="275" y="420" fill="#ccccaa" font-size="8.5">GND</text>
+
+  <!-- Right side GPIO labels on ESP32-CAM block -->
+  <text x="390" y="118" text-anchor="end" fill="#aaddaa" font-size="8.5">IO15</text>
+  <text x="390" y="148" text-anchor="end" fill="#ccccaa" font-size="8.5">GND</text>
+  <text x="390" y="228" text-anchor="end" fill="#aaddaa" font-size="8.5">IO2</text>
+  <text x="390" y="258" text-anchor="end" fill="#ccccaa" font-size="8.5">GND</text>
+  <text x="390" y="348" text-anchor="end" fill="#aaddaa" font-size="8.5">IO1/TX</text>
+  <text x="390" y="378" text-anchor="end" fill="#aaddaa" font-size="8.5">IO3/RX</text>
+  <text x="390" y="408" text-anchor="end" fill="#ccccaa" font-size="8.5">IO0</text>
+  <text x="390" y="438" text-anchor="end" fill="#ccccaa" font-size="8.5">GND</text>
+
+  <!-- ══ LEFT COMPONENTS ══ -->
+
+  <!-- DHT22 -->
+  <rect x="20" y="90" width="130" height="70" rx="6"
+        fill="#ddeedd" stroke="#446644" stroke-width="1.5"/>
+  <text x="85" y="115" text-anchor="middle" fill="#223322"
+        font-size="11" font-weight="bold">DHT22</text>
+  <text x="85" y="131" text-anchor="middle" fill="#334433" font-size="9">Temp / Humidity</text>
+  <text x="85" y="147" text-anchor="middle" fill="#445544" font-size="8">GPIO4 · 3V3 · GND</text>
+
+  <!-- DHT22 wires -->
+  <line x1="150" y1="115" x2="270" y2="115" stroke="#0a7a0a" stroke-width="1.8"/>
+  <text x="210" y="111" text-anchor="middle" fill="#0a7a0a" font-size="8">Data</text>
+  <line x1="150" y1="143" x2="270" y2="143" stroke="#cc2222" stroke-width="1.5"/>
+  <text x="210" y="139" text-anchor="middle" fill="#cc2222" font-size="8">3.3V</text>
+  <line x1="150" y1="155" x2="270" y2="173" stroke="#444"   stroke-width="1.5"/>
+  <text x="210" y="170" text-anchor="middle" fill="#444"    font-size="8">GND</text>
+
+  <!-- LDR Voltage Divider -->
+  <rect x="20" y="210" width="130" height="70" rx="6"
+        fill="#ddeeff" stroke="#446688" stroke-width="1.5"/>
+  <text x="85" y="234" text-anchor="middle" fill="#223344"
+        font-size="11" font-weight="bold">LDR + 10 k&Omega;</text>
+  <text x="85" y="250" text-anchor="middle" fill="#334455" font-size="9">Voltage Divider</text>
+  <text x="85" y="266" text-anchor="middle" fill="#445566" font-size="8">IO34 · 3V3 · GND</text>
+
+  <!-- LDR wires -->
+  <line x1="150" y1="233" x2="270" y2="235" stroke="#1a4a9a" stroke-width="1.8"/>
+  <text x="210" y="229" text-anchor="middle" fill="#1a4a9a" font-size="8">ADC</text>
+  <line x1="150" y1="250" x2="270" y2="263" stroke="#cc2222" stroke-width="1.5"/>
+  <text x="210" y="258" text-anchor="middle" fill="#cc2222" font-size="8">3.3V</text>
+  <line x1="150" y1="262" x2="270" y2="293" stroke="#444"   stroke-width="1.5"/>
+  <text x="210" y="290" text-anchor="middle" fill="#444"    font-size="8">GND</text>
+
+  <!-- Relay Module -->
+  <rect x="20" y="330" width="130" height="70" rx="6"
+        fill="#ffeecc" stroke="#886622" stroke-width="1.5"/>
+  <text x="85" y="354" text-anchor="middle" fill="#332200"
+        font-size="11" font-weight="bold">Relay Module</text>
+  <text x="85" y="370" text-anchor="middle" fill="#443311" font-size="9">Door Lock</text>
+  <text x="85" y="386" text-anchor="middle" fill="#554422" font-size="8">IO26 · VCC · GND</text>
+
+  <!-- Relay wires -->
+  <line x1="150" y1="353" x2="270" y2="357" stroke="#0a7a0a" stroke-width="1.8"/>
+  <text x="210" y="349" text-anchor="middle" fill="#0a7a0a" font-size="8">Signal IN</text>
+  <line x1="150" y1="365" x2="270" y2="385" stroke="#cc2222" stroke-width="1.5"/>
+  <text x="210" y="380" text-anchor="middle" fill="#cc2222" font-size="8">5V</text>
+  <line x1="150" y1="377" x2="270" y2="415" stroke="#444"   stroke-width="1.5"/>
+  <text x="210" y="413" text-anchor="middle" fill="#444"    font-size="8">GND</text>
+
+  <!-- ══ RIGHT COMPONENTS ══ -->
+
+  <!-- Push Button -->
+  <rect x="550" y="90" width="130" height="70" rx="6"
+        fill="#eeddff" stroke="#664488" stroke-width="1.5"/>
+  <text x="615" y="115" text-anchor="middle" fill="#221133"
+        font-size="11" font-weight="bold">Push Button</text>
+  <text x="615" y="131" text-anchor="middle" fill="#332244" font-size="9">Auth Trigger</text>
+  <text x="615" y="147" text-anchor="middle" fill="#443355" font-size="8">IO15 · GND (active-low)</text>
+
+  <!-- Button wires -->
+  <line x1="430" y1="115" x2="550" y2="115" stroke="#0a7a0a" stroke-width="1.8"/>
+  <text x="490" y="111" text-anchor="middle" fill="#0a7a0a" font-size="8">Signal</text>
+  <line x1="430" y1="143" x2="550" y2="143" stroke="#444"   stroke-width="1.5"/>
+  <text x="490" y="139" text-anchor="middle" fill="#444"    font-size="8">GND</text>
+
+  <!-- LED + 220R -->
+  <rect x="550" y="200" width="130" height="70" rx="6"
+        fill="#ffeeee" stroke="#884444" stroke-width="1.5"/>
+  <text x="615" y="224" text-anchor="middle" fill="#330000"
+        font-size="11" font-weight="bold">LED + 220 &Omega;</text>
+  <text x="615" y="240" text-anchor="middle" fill="#441111" font-size="9">Status Indicator</text>
+  <text x="615" y="256" text-anchor="middle" fill="#552222" font-size="8">IO2 · GND</text>
+
+  <!-- LED wires -->
+  <line x1="430" y1="225" x2="550" y2="225" stroke="#0a7a0a" stroke-width="1.8"/>
+  <text x="490" y="221" text-anchor="middle" fill="#0a7a0a" font-size="8">Anode (via R)</text>
+  <line x1="430" y1="253" x2="550" y2="253" stroke="#444"   stroke-width="1.5"/>
+  <text x="490" y="249" text-anchor="middle" fill="#444"    font-size="8">Cathode → GND</text>
+
+  <!-- FTDI Adapter -->
+  <rect x="550" y="320" width="130" height="110" rx="6"
+        fill="#eeeedd" stroke="#888844" stroke-width="1.5"/>
+  <text x="615" y="344" text-anchor="middle" fill="#222200"
+        font-size="11" font-weight="bold">FTDI Adapter</text>
+  <text x="615" y="360" text-anchor="middle" fill="#333311" font-size="9">USB-UART 3.3V</text>
+  <text x="615" y="376" text-anchor="middle" fill="#333311" font-size="8">Flash &amp; Debug</text>
+  <text x="615" y="394" text-anchor="middle" fill="#444422" font-size="8">IO1/TX · IO3/RX</text>
+  <text x="615" y="410" text-anchor="middle" fill="#444422" font-size="8">IO0 · GND</text>
+
+  <!-- FTDI wires -->
+  <line x1="430" y1="345" x2="550" y2="345" stroke="#0a7a0a" stroke-width="1.8"/>
+  <text x="490" y="341" text-anchor="middle" fill="#0a7a0a" font-size="8">RX &larr; TX</text>
+  <line x1="430" y1="375" x2="550" y2="375" stroke="#0a7a0a" stroke-width="1.8"/>
+  <text x="490" y="371" text-anchor="middle" fill="#0a7a0a" font-size="8">TX &rarr; RX</text>
+  <line x1="430" y1="405" x2="550" y2="405" stroke="#cc7700" stroke-width="1.5"/>
+  <text x="490" y="401" text-anchor="middle" fill="#cc7700" font-size="8">IO0 (flash)</text>
+  <line x1="430" y1="435" x2="550" y2="435" stroke="#444"   stroke-width="1.5"/>
+  <text x="490" y="432" text-anchor="middle" fill="#444"    font-size="8">GND</text>
+
+  <!-- Wire colour legend -->
+  <rect x="200" y="504" width="300" height="14" rx="3" fill="#f5f5f5" stroke="#ccc"/>
+  <line x1="210" y1="511" x2="228" y2="511" stroke="#0a7a0a" stroke-width="2"/>
+  <text x="232" y="515" fill="#222" font-size="8">Signal / Data</text>
+  <line x1="305" y1="511" x2="323" y2="511" stroke="#cc2222" stroke-width="2"/>
+  <text x="327" y="515" fill="#222" font-size="8">Power</text>
+  <line x1="380" y1="511" x2="398" y2="511" stroke="#444"   stroke-width="2"/>
+  <text x="402" y="515" fill="#222" font-size="8">GND</text>
+</svg>
+<figcaption>Figure 2: Peripheral wiring overview -- ESP32-CAM connections to all project components</figcaption>
+</figure>
+<div class="pg">11</div>
+</div>
+
+<!-- ── Step 9 continued: LDR detail + Setup Steps ── -->
+<div class="page page-break">
+<div class="rh">Iris Biometric Access Control &nbsp;--&nbsp; IoT Design Methodology Report</div>
+
+<!-- ── DIAGRAM 3: LDR VOLTAGE DIVIDER + PIN TABLE ── -->
+<h3>LDR Voltage Divider &amp; ADC Detail</h3>
+<figure>
+<svg viewBox="0 0 620 190" xmlns="http://www.w3.org/2000/svg"
+     style="width:100%;max-width:620px;font-family:Arial,Helvetica,sans-serif;">
+
+  <!-- 3.3V rail -->
+  <line x1="80" y1="40" x2="80" y2="75" stroke="#cc2222" stroke-width="2"/>
+  <text x="80" y="34" text-anchor="middle" fill="#cc2222"
+        font-size="11" font-weight="bold">3.3V</text>
+
+  <!-- LDR symbol (resistor with arrow) -->
+  <rect x="60" y="75" width="40" height="18" rx="3"
+        fill="#fff" stroke="#444" stroke-width="1.5"/>
+  <text x="80" y="88" text-anchor="middle" fill="#222" font-size="9" font-weight="bold">LDR</text>
+  <!-- arrow for light sensitivity -->
+  <line x1="105" y1="70" x2="115" y2="80" stroke="#cc8800" stroke-width="1.2"/>
+  <line x1="112" y1="64" x2="122" y2="74" stroke="#cc8800" stroke-width="1.2"/>
+  <polygon points="115,80 109,72 118,71" fill="#cc8800"/>
+  <polygon points="122,74 116,66 125,65" fill="#cc8800"/>
+  <text x="125" y="67" fill="#cc8800" font-size="8">light</text>
+
+  <!-- Junction node -->
+  <line x1="80" y1="93" x2="80" y2="120" stroke="#444" stroke-width="2"/>
+  <circle cx="80" cy="120" r="4.5" fill="#1a4a9a"/>
+
+  <!-- 10kΩ resistor -->
+  <rect x="60" y="120" width="40" height="18" rx="3"
+        fill="#fff" stroke="#444" stroke-width="1.5"/>
+  <text x="80" y="133" text-anchor="middle" fill="#222" font-size="9">10 k&Omega;</text>
+
+  <!-- GND -->
+  <line x1="80" y1="138" x2="80" y2="165" stroke="#444" stroke-width="2"/>
+  <line x1="62" y1="165" x2="98"  y2="165" stroke="#444" stroke-width="2"/>
+  <line x1="68" y1="170" x2="92"  y2="170" stroke="#444" stroke-width="1.5"/>
+  <line x1="74" y1="175" x2="86"  y2="175" stroke="#444" stroke-width="1"/>
+  <text x="80" y="185" text-anchor="middle" fill="#444" font-size="10">GND</text>
+
+  <!-- Wire to GPIO34 -->
+  <line x1="80"  y1="120" x2="210" y2="120" stroke="#1a4a9a" stroke-width="2"/>
+  <text x="145" y="113" text-anchor="middle" fill="#1a4a9a" font-size="9">ADC signal</text>
+
+  <!-- ESP32-CAM ADC block -->
+  <rect x="210" y="95" width="130" height="50" rx="5"
+        fill="#1e5c1e" stroke="#0d3a0d" stroke-width="1.5"/>
+  <text x="275" y="116" text-anchor="middle" fill="#fff"
+        font-size="10" font-weight="bold">ESP32-CAM</text>
+  <text x="275" y="131" text-anchor="middle" fill="#aaddaa"
+        font-size="9">GPIO34 / ADC1-ch6</text>
+  <text x="275" y="143" text-anchor="middle" fill="#88bb88"
+        font-size="8">12-bit (0-4095)</text>
+
+  <!-- Formula -->
+  <rect x="375" y="88" width="225" height="72" rx="5"
+        fill="#f5f5ff" stroke="#8888cc" stroke-width="1"/>
+  <text x="487" y="108" text-anchor="middle" fill="#333"
+        font-size="10" font-weight="bold">Normalisation</text>
+  <text x="487" y="126" text-anchor="middle" fill="#222" font-size="9.5">lightNorm = analogRead(34) / 4095.0</text>
+  <text x="487" y="143" text-anchor="middle" fill="#555" font-size="9">Bright &rarr; high ADC &rarr; lightNorm &rarr; 1.0</text>
+  <text x="487" y="157" text-anchor="middle" fill="#555" font-size="9">Dark  &rarr; low  ADC &rarr; lightNorm &rarr; 0.0</text>
+</svg>
+<figcaption>Figure 3: LDR voltage divider circuit and ADC normalisation formula (GPIO34, ADC1 channel 6)</figcaption>
+</figure>
+
+<h3>GPIO Pin Assignment Summary</h3>
+<table>
+  <thead><tr><th>GPIO</th><th>Direction</th><th>Connected To</th><th>Function</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>GPIO4</td><td>Input</td><td>DHT22 data pin</td><td>Temperature &amp; humidity sensor</td><td>10&nbsp;k&Omega; pull-up to 3.3&nbsp;V</td></tr>
+    <tr><td>GPIO34</td><td>Input (ADC)</td><td>LDR voltage divider junction</td><td>Ambient light level</td><td>ADC1 ch.6; input only; max 3.3&nbsp;V</td></tr>
+    <tr><td>GPIO26</td><td>Output</td><td>Relay module IN pin</td><td>Door lock control</td><td>Reassign if conflict with OV2640 SIOD</td></tr>
+    <tr><td>GPIO2</td><td>Output</td><td>LED + 220&nbsp;&Omega; resistor</td><td>FSM state indicator</td><td>On-board blue LED on AI Thinker</td></tr>
+    <tr><td>GPIO15</td><td>Input</td><td>Momentary push button to GND</td><td>Authentication trigger</td><td>Internal pull-up; active-low</td></tr>
+    <tr><td>GPIO1 (TX)</td><td>Output (UART)</td><td>FTDI adapter RX</td><td>Serial debug / flash</td><td>Shared with UART0 TX</td></tr>
+    <tr><td>GPIO3 (RX)</td><td>Input (UART)</td><td>FTDI adapter TX</td><td>Serial debug / flash</td><td>Shared with UART0 RX</td></tr>
+    <tr><td>GPIO0</td><td>Input</td><td>FTDI IO0 or BOOT button</td><td>Flash mode select</td><td>Pull LOW to enter bootloader</td></tr>
+  </tbody>
+</table>
+
+<h3>Setup Steps</h3>
+<ul class="dash">
+  <li>Wire DHT22 data pin to GPIO4 with 10&nbsp;k&Omega; pull-up resistor to 3.3&nbsp;V</li>
+  <li>Wire LDR + 10&nbsp;k&Omega; voltage divider output to GPIO34; never exceed 3.3&nbsp;V on any ADC pin</li>
+  <li>Wire relay module IN to GPIO26 (or alternate per config.json); connect door lock solenoid to relay COM/NO</li>
+  <li>Wire 220&nbsp;&Omega; + LED from GPIO2 to GND; on-board blue LED is already wired to GPIO2 on AI Thinker</li>
+  <li>Wire push button between GPIO15 and GND; GPIO15 uses firmware-enabled internal pull-up</li>
+  <li>Connect FTDI adapter (TX&rarr;GPIO3, RX&rarr;GPIO1, GND&rarr;GND, 3.3&nbsp;V&rarr;3.3&nbsp;V); bridge GPIO0 to GND for flash mode</li>
+  <li>In Arduino IDE: Board &rarr; AI Thinker ESP32-CAM; Partition Scheme &rarr; Huge APP (3&nbsp;MB app / 1&nbsp;MB SPIFFS)</li>
+  <li>Populate <code>firmware/esp32_sensor_node/data/config.json</code> with device credentials and pin assignments</li>
+  <li>Tools &rarr; ESP32 Sketch Data Upload to flash SPIFFS; then Verify + Upload firmware sketch</li>
+  <li>Open Serial Monitor at 115&nbsp;200&nbsp;baud to confirm: INIT &rarr; CONNECTING &rarr; READY &rarr; MONITORING</li>
+  <li>Use dashboard Enrolled Users panel to send the first enrollment command via Firebase</li>
+</ul>
+<div class="pg">12</div>
+</div>
+
+<!-- ══════════════════ STEP 10 ══════════════════ -->
+<div class="page page-break">
+<div class="rh">Iris Biometric Access Control &nbsp;--&nbsp; IoT Design Methodology Report</div>
+
+<h2>Step 10: Application Development</h2>
+<p>The application layer spans three components: the ESP32-CAM firmware (C++, Arduino framework),
+the Firebase RTDB backend (schema + security rules), and the web dashboard
+(<code>frontend/app.js</code>). The firmware is the most substantial component and is covered in
+full below.</p>
+
+<h3>IrisCamera.h -- Defines &amp; Feature Extraction Interface</h3>
+<pre>#pragma once
+#include "esp_camera.h"
+
+#define IRIS_FEATURE_COUNT   64U   // 8x8 zonal grid
+#define IRIS_GRID_ROWS        8U
+#define IRIS_GRID_COLS        8U
+#define FRAME_WIDTH         160U
+#define FRAME_HEIGHT        120U
+
+struct IrisCapture {
+    float         features[IRIS_FEATURE_COUNT]; // mean cell intensity [0,1]
+    bool          valid;
+    unsigned long timestampMs;
+};
+
+class IrisCamera {
+public:
+    bool        begin();
+    IrisCapture capture();
+    IrisCapture captureAverage(uint8_t numFrames, uint16_t delayMs);
+private:
+    void        _extractFeatures(uint8_t *grayBuf, float *features);
+};</pre>
+
+<h3>IrisCamera.cpp -- Feature Extraction &amp; Multi-Frame Average</h3>
+<pre>/* Divide 160x120 frame into 8x8 grid; store mean intensity per cell */
+void IrisCamera::_extractFeatures(uint8_t *buf, float *features) {
+    const uint16_t cellW = FRAME_WIDTH  / IRIS_GRID_COLS;   // 20 px
+    const uint16_t cellH = FRAME_HEIGHT / IRIS_GRID_ROWS;   // 15 px
+    for (uint8_t gy = 0; gy < IRIS_GRID_ROWS; gy++) {
+        for (uint8_t gx = 0; gx < IRIS_GRID_COLS; gx++) {
+            uint32_t sum = 0, count = 0;
+            for (uint16_t py = gy*cellH; py < (gy+1)*cellH; py++)
+                for (uint16_t px = gx*cellW; px < (gx+1)*cellW; px++) {
+                    sum += buf[py * FRAME_WIDTH + px];
+                    count++;
+                }
+            features[gy * IRIS_GRID_COLS + gx] =
+                count ? (float)sum / (count * 255.0f) : 0.0f;
+        }
+    }
+}
+
+/* Accumulate N valid frames; return mean descriptor */
+IrisCapture IrisCamera::captureAverage(uint8_t numFrames, uint16_t delayMs) {
+    float acc[IRIS_FEATURE_COUNT] = {0};
+    uint8_t valid = 0;
+    for (uint8_t i = 0; i < numFrames; i++) {
+        IrisCapture f = capture();
+        if (f.valid) {
+            for (uint8_t j = 0; j < IRIS_FEATURE_COUNT; j++)
+                acc[j] += f.features[j];
+            valid++;
+        }
+        delay(delayMs);
+    }
+    IrisCapture result;
+    result.valid       = (valid > 0);
+    result.timestampMs = millis();
+    if (valid)
+        for (uint8_t j = 0; j < IRIS_FEATURE_COUNT; j++)
+            result.features[j] = acc[j] / valid;
+    return result;
+}</pre>
+<div class="pg">13</div>
+</div>
+
+<div class="page page-break">
+<div class="rh">Iris Biometric Access Control &nbsp;--&nbsp; IoT Design Methodology Report</div>
+
+<h3>BiometricManager.cpp -- Normalised RMS Template Matching &amp; Enrollment</h3>
+<pre>MatchResult BiometricManager::match(const IrisCapture &query) {
+    MatchResult best;
+    best.matched = false;
+    best.score   = 1.0f;     // worst possible distance
+    if (!query.valid) return best;
+
+    for (auto &user : _users) {
+        for (uint8_t t = 0; t < user.templateCount; t++) {
+            float templ[IRIS_FEATURE_COUNT];
+            if (!_loadTemplate(user.userId, t, templ)) continue;
+
+            /* Normalised RMS: sqrt( sum((q[i]-t[i])^2) / 64 ) */
+            float sumSq = 0.0f;
+            for (uint8_t i = 0; i < IRIS_FEATURE_COUNT; i++) {
+                float diff = query.features[i] - templ[i];
+                sumSq += diff * diff;
+            }
+            float dist = sqrtf(sumSq / IRIS_FEATURE_COUNT);
+            if (dist < best.score) {
+                best.score       = dist;
+                best.userId      = user.userId;
+                best.userName    = user.name;
+                best.templateIdx = t;
+            }
+        }
+    }
+    best.matched = (best.score < _threshold);   // default 0.30
+    return best;
+}
+
+bool BiometricManager::enroll(const String &userId, const String &name,
+                               const IrisCapture &cap) {
+    if (!cap.valid) return false;
+    UserRecord *rec = _findOrCreate(userId, name);
+    uint8_t slot = rec->templateCount % MAX_TEMPLATES_PER_USER; // ring overwrite
+    String path  = "/bio/" + userId + "_t" + String(slot) + ".bin";
+    File f = SPIFFS.open(path, FILE_WRITE);
+    if (!f) return false;
+    f.write((uint8_t *)cap.features, IRIS_FEATURE_COUNT * sizeof(float));
+    f.close();
+    rec->templateCount =
+        min((int)rec->templateCount + 1, MAX_TEMPLATES_PER_USER);
+    _saveRegistry();   // update /bio/users.json
+    return true;
+}</pre>
+
+<h3>AnomalyDetector.cpp -- Sliding Window &amp; Composite Score</h3>
+<pre>#define ANOMALY_WINDOW_SIZE 20U
+
+float AnomalyDetector::record(const MatchResult &result, bool success) {
+    _window[_head] = { result.score, success, millis() };
+    _head = (_head + 1) % ANOMALY_WINDOW_SIZE;
+    if (_filled < ANOMALY_WINDOW_SIZE) _filled++;
+
+    /* component 1: failure rate (weight 0.40) */
+    uint8_t failures = 0;
+    for (uint8_t i = 0; i < _filled; i++)
+        if (!_window[i].success) failures++;
+    float failureRate = (float)failures / _filled;
+
+    /* component 2: score proximity -- spoofing signal (weight 0.35)
+       A score just below threshold suggests a partial replay attack  */
+    float scoreProximity = 0.0f;
+    if (success && result.score < _threshold)
+        scoreProximity = 1.0f - (result.score / _threshold);
+
+    /* component 3: frequency spike -- >5 events in 60 s (weight 0.25) */
+    uint32_t now = millis();
+    uint8_t  recent = 0;
+    for (uint8_t i = 0; i < _filled; i++)
+        if ((now - _window[i].ts) < 60000UL) recent++;
+    float freqSpike = (recent > 5) ? 1.0f : (float)recent / 5.0f;
+
+    _lastScore = 0.40f * failureRate
+               + 0.35f * scoreProximity
+               + 0.25f * freqSpike;
+    return _lastScore;
+}</pre>
+<div class="pg">14</div>
+</div>
+
+<div class="page page-break">
+<div class="rh">Iris Biometric Access Control &nbsp;--&nbsp; IoT Design Methodology Report</div>
+
+<h3>StateManager.cpp -- FSM Legal Transition Table</h3>
+<pre>/* Rows = current state, columns = target state
+   States: INIT CONN READY MON ALERT ERR ENROL AUTH AUTHED REJ  */
+static const bool _legal[STATE_COUNT][STATE_COUNT] = {
+ /* INIT  */ { 0, 1, 0, 0, 0, 1, 0, 0, 0, 0 },
+ /* CONN  */ { 0, 0, 1, 0, 0, 1, 0, 0, 0, 0 },
+ /* READY */ { 0, 0, 0, 1, 0, 1, 0, 0, 0, 0 },
+ /* MON   */ { 0, 0, 0, 0, 1, 1, 1, 1, 0, 0 },
+ /* ALERT */ { 0, 0, 0, 1, 0, 1, 0, 0, 0, 0 },
+ /* ERR   */ { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+ /* ENROL */ { 0, 0, 0, 1, 0, 1, 0, 0, 0, 0 },
+ /* AUTH  */ { 0, 0, 0, 0, 0, 1, 0, 0, 1, 1 },
+ /* AUTHED*/ { 0, 0, 0, 1, 0, 1, 0, 0, 0, 0 },
+ /* REJ   */ { 0, 0, 0, 1, 0, 1, 0, 0, 0, 0 },
+};
+
+bool StateManager::transition(DeviceState next) {
+    if (!_legal[_state][next]) {
+        Serial.printf("[FSM] ILLEGAL %s -> %s\n",
+                      stateName(_state), stateName(next));
+        return false;
+    }
+    unsigned long elapsed = millis() - _enteredMs;
+    Serial.printf("[FSM] %s -> %s  (%lu ms)\n",
+                  stateName(_state), stateName(next), elapsed);
+    _state     = next;
+    _enteredMs = millis();
+    return true;
+}</pre>
+
+<h3>FirebaseManager.cpp -- Sign-in Push &amp; Enrollment Poll</h3>
+<pre>void FirebaseManager::pushSignIn(const MatchResult &r,
+                                  bool success, float anomalyScore) {
+    FirebaseJson json;
+    json.set("userId",       r.userId.isEmpty() ? "unknown" : r.userId);
+    json.set("userName",     r.userName);
+    json.set("deviceId",     _deviceId);
+    json.set("matchScore",   r.score);
+    json.set("success",      success);
+    json.set("anomalyScore", anomalyScore);
+    json.set("ts/.sv",       "timestamp");      // server-side timestamp
+    String path = "/signins/" + _deviceId;
+    if (!Firebase.RTDB.pushJSON(&_fbdo, path.c_str(), &json)) {
+        _offBuf[_bufHead % OFFLINE_BUFFER_SIZE] = json.raw(); // buffer offline
+        _bufHead++;
+    }
+}
+
+bool FirebaseManager::pollEnrollCommand(String &userId, String &name) {
+    String base = "/devices/" + _deviceId + "/commands/enroll";
+    FirebaseData fd;
+    if (!Firebase.RTDB.getBool(&fd, (base + "/pending").c_str()))
+        return false;
+    if (!fd.boolData()) return false;
+    Firebase.RTDB.getString(&fd, (base + "/userId").c_str());
+    userId = fd.stringData();
+    Firebase.RTDB.getString(&fd, (base + "/name").c_str());
+    name   = fd.stringData();
+    Firebase.RTDB.setBool(&_fbdo, (base + "/pending").c_str(), false);
+    return true;
+}</pre>
+<div class="pg">15</div>
+</div>
+
+<div class="page page-break">
+<div class="rh">Iris Biometric Access Control &nbsp;--&nbsp; IoT Design Methodology Report</div>
+
+<h3>AWSIoTManager.cpp -- MQTT Biometric Event &amp; Alert Publish</h3>
+<pre>void AWSIoTManager::publishBiometricEvent(const MatchResult &r,
+                                           bool success, float anomaly) {
+    char buf[384];
+    snprintf(buf, sizeof(buf),
+        "{\"deviceId\":\"%s\","
+        "\"userId\":\"%s\","
+        "\"userName\":\"%s\","
+        "\"matchScore\":%.4f,"
+        "\"success\":%s,"
+        "\"anomalyScore\":%.4f,"
+        "\"ts\":%lu}",
+        _thingName.c_str(),
+        r.userId.isEmpty() ? "unknown" : r.userId.c_str(),
+        r.userName.c_str(),
+        r.score,
+        success ? "true" : "false",
+        anomaly,
+        (unsigned long)millis());
+    _mqtt.publish(("iot/" + _thingName + "/biometric/signin").c_str(), buf);
+}
+
+void AWSIoTManager::publishAlertJson(const String &alertType,
+                                      const String &userId, float anomaly) {
+    char buf[256];
+    snprintf(buf, sizeof(buf),
+        "{\"deviceId\":\"%s\","
+        "\"alertType\":\"%s\","
+        "\"userId\":\"%s\","
+        "\"anomalyScore\":%.4f,"
+        "\"ts\":%lu}",
+        _thingName.c_str(),
+        alertType.c_str(),
+        userId.c_str(),
+        anomaly,
+        (unsigned long)millis());
+    _mqtt.publish(("iot/" + _thingName + "/biometric/alert").c_str(), buf);
+}</pre>
+
+<h3>main.ino -- setup() &amp; loop() State Machine</h3>
+<pre>void setup() {
+    Serial.begin(115200);
+    stateMgr.transition(INIT);
+    configMgr.load();                        // read SPIFFS config.json
+    sensorMgr.begin(configMgr.dhtPin, configMgr.ldrPin);
+    actuatorCtrl.begin(configMgr.relayPin, configMgr.ledPin);
+    mlInference.begin();                     // load tinyml_model.h tensor arena
+    irisCamera.begin();
+    bioMgr.begin(configMgr.irisMatchThreshold);
+    stateMgr.transition(CONNECTING);
+    WiFi.begin(configMgr.wifiSsid, configMgr.wifiPassword);
+    while (WiFi.status() != WL_CONNECTED) delay(500);
+    firebaseMgr.begin(configMgr);
+    awsIotMgr.begin(configMgr);
+    stateMgr.transition(READY);
+    stateMgr.transition(MONITORING);
+}
+
+void loop() {
+    awsIotMgr.loop();                        // MQTT keepalive + message pump
+    SensorData sd   = sensorMgr.read();
+    float riskScore = mlInference.predict(sd);
+    DeviceState st  = stateMgr.getState();
+    actuatorCtrl.tick(st, riskScore);
+    firebaseMgr.pushLatest(sd, riskScore, stateMgr.stateName());
+    firebaseMgr.pushHeartbeat(stateMgr.stateName());
+
+    /* Environmental alert path */
+    if (st == MONITORING && riskScore >= configMgr.mlRiskThreshold) {
+        stateMgr.transition(ALERT);
+        firebaseMgr.pushAlert("env_threshold", "", riskScore, 0.0f);
+    }
+    /* Button-triggered authentication */
+    if (st == MONITORING && digitalRead(configMgr.authButtonPin) == LOW) {
+        stateMgr.transition(AUTHENTICATING);
+        IrisCapture cap = irisCamera.captureAverage(
+                              configMgr.irisEnrollFrames, 200);
+        MatchResult res = bioMgr.match(cap);
+        float aScore    = anomalyDetector.record(res, res.matched);
+        firebaseMgr.pushSignIn(res, res.matched, aScore);
+        awsIotMgr.publishBiometricEvent(res, res.matched, aScore);
+        stateMgr.transition(res.matched ? AUTHENTICATED : REJECTED);
+        delay(res.matched ? configMgr.authDisplayMs : 1500);
+        if (aScore >= configMgr.anomalyScoreThreshold)
+            alertMgr.dispatchAlert("brute_force", res.userId, aScore);
+        stateMgr.transition(MONITORING);
+    }
+    /* Enrollment command from dashboard */
+    String enrollId, enrollName;
+    if (st == MONITORING &&
+        firebaseMgr.pollEnrollCommand(enrollId, enrollName)) {
+        stateMgr.transition(ENROLLING);
+        IrisCapture cap = irisCamera.captureAverage(
+                              configMgr.irisEnrollFrames, 200);
+        if (cap.valid) {
+            bioMgr.enroll(enrollId, enrollName, cap);
+            firebaseMgr.pushEnrollment(enrollId, enrollName);
+        }
+        stateMgr.transition(MONITORING);
+    }
+    /* Relay override from dashboard */
+    actuatorCtrl.applyOverride(firebaseMgr.getRelayOverride());
+    delay(100);
+}</pre>
+<div class="pg">16</div>
+</div>
+
+<div class="page">
+<div class="rh">Iris Biometric Access Control &nbsp;--&nbsp; IoT Design Methodology Report</div>
+
+<h3>app.js -- Firebase Listeners &amp; Dashboard State (frontend)</h3>
+<pre>import { initializeApp }           from "firebase/app";
+import { getDatabase, ref, onValue,
+         set, query as fbQuery,
+         limitToLast }             from "firebase/database";
+import { getAuth,
+         signInWithEmailAndPassword } from "firebase/auth";
+
+const FIREBASE_CONFIG = { /* paste from Firebase console */ };
+const DASH_EMAIL      = "dashboard@yourdomain.com";
+const DASH_PASSWORD   = "DashboardPassword";
+
+const app  = initializeApp(FIREBASE_CONFIG);
+const db   = getDatabase(app);
+const auth = getAuth(app);
+
+await signInWithEmailAndPassword(auth, DASH_EMAIL, DASH_PASSWORD);
+
+/* Live device health table */
+onValue(ref(db, "/devices"), snap => {
+    renderDeviceHealthTable(snap.val() || {});
+});
+
+/* Sign-in log -- last 50 events per device */
+function subscribeSignIns(deviceId) {
+    const q = fbQuery(ref(db, `/signins/${deviceId}`), limitToLast(50));
+    onValue(q, snap => {
+        const rows = [];
+        snap.forEach(child => rows.unshift(child.val()));
+        renderSignInLog(rows);            // newest first
+    });
+}
+
+/* Enrollment command dispatch from dashboard UI */
+async function sendEnrollCommand(deviceId, userId, name) {
+    await set(ref(db, `/devices/${deviceId}/commands/enroll`), {
+        userId, name, pending: true
+    });
+}
+
+/* Manual relay override with 5-minute client-side countdown */
+async function setRelayOverride(deviceId, command) {
+    await set(
+        ref(db, `/devices/${deviceId}/commands/relayOverride`),
+        command
+    );
+    if (command !== "AUTO") startOverrideCountdown(deviceId, 300);
+}
+
+/* Row status classification for sign-in log colour coding */
+function statusFor(event) {
+    if (!event)                           return "Awaiting Data";
+    if (event.anomalyScore >= 0.60)       return "Anomaly";
+    if (!event.success)                   return "Rejected";
+    return "Authenticated";
+}
+
+/* Sensor chart -- subscribe /readings/{id}, plot last 40 points */
+function subscribeReadings(deviceId, chart) {
+    const q = fbQuery(ref(db, `/readings/${deviceId}`), limitToLast(40));
+    onValue(q, snap => {
+        const pts = [];
+        snap.forEach(c => pts.push(c.val()));
+        chart.update(pts);
+    });
+}</pre>
+<div class="pg">17</div>
+</div>
+
+</body>
+</html>

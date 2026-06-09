@@ -4,6 +4,9 @@ import basicSsl from '@vitejs/plugin-basic-ssl';
 
 export default defineConfig({
   plugins: [react(), basicSsl()],
+  optimizeDeps: {
+    include: ['jsqr'],
+  },
   server: {
     https: true,
     host: true,   // exposes on your local network (192.168.x.x)
