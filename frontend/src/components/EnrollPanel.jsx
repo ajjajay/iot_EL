@@ -19,10 +19,12 @@ function captureJpegBase64(videoEl) {
 export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
   const showToast = useToast();
 
-  const [mode,     setMode]     = useState('webcam'); // 'device' | 'webcam'
-  const [deviceId, setDeviceId] = useState('');
-  const [userId,   setUserId]   = useState('');
-  const [name,     setName]     = useState('');
+  const [mode,           setMode]           = useState('webcam'); // 'device' | 'webcam'
+  const [deviceId,       setDeviceId]       = useState('');
+  const [userId,         setUserId]         = useState('');
+  const [name,           setName]           = useState('');
+  const [role,           setRole]           = useState('staff');
+  const [allowedDevices, setAllowedDevices] = useState([]);
 
   const videoRef  = useRef(null);
   const canvasRef = useRef(null);
@@ -51,6 +53,12 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
     streamRef.current = null;
   }
 
+  function toggleAllowedDevice(id) {
+    setAllowedDevices(prev =>
+      prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
+    );
+  }
+
   function switchMode(m) {
     stopStream();
     setCamPhase('idle');
@@ -68,9 +76,10 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
     if (!deviceId)    { showToast('Select a device first', 'info'); return; }
     if (!uid)         { showToast('Enter a User ID', 'info'); return; }
     if (!name.trim()) { showToast("Enter the user's name", 'info'); return; }
+    const devices = role === 'admin' ? deviceIds : allowedDevices;
     try {
-      await onSendEnroll(deviceId, uid, name.trim());
-      setUserId(''); setName('');
+      await onSendEnroll(deviceId, uid, name.trim(), role, devices);
+      setUserId(''); setName(''); setAllowedDevices([]);
     } catch {}
   }
 
@@ -134,37 +143,28 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
   async function confirmEnroll() {
     const uid = userId.trim().replace(/\s+/g, '_');
     try {
+      const devices = role === 'admin' ? deviceIds : allowedDevices;
       if (USE_REKOGNITION && imageBase64) {
-        // Send JPEG to Lambda enroll endpoint → Rekognition IndexFaces → Firebase write
         const resp = await fetch(`${AUTH_API_URL}/enroll`, {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({
-            deviceId,
-            userId:      uid,
-            name:        name.trim(),
-            imageBase64,
-          }),
+          body:    JSON.stringify({ deviceId, userId: uid, name: name.trim(), imageBase64 }),
         });
         if (!resp.ok) throw new Error(`Enroll API error: ${resp.status}`);
         const data = await resp.json();
-
         if (data.status === 'no_face') {
           showToast('No face detected — try again with better lighting', 'alert');
-          setCamPhase('live');  // let them re-capture
+          setCamPhase('live');
           setImageBase64(null);
           return;
         }
-
-        // Lambda wrote the user record to Firebase; notify parent (no template)
-        await onWebcamEnroll(deviceId, uid, name.trim(), null);
+        await onWebcamEnroll(deviceId, uid, name.trim(), null, role, devices);
         cancelWebcam();
-        setUserId(''); setName('');
+        setUserId(''); setName(''); setAllowedDevices([]);
       } else if (template) {
-        // Local mode: pass the averaged template to parent, which saves it to Firebase
-        await onWebcamEnroll(deviceId, uid, name.trim(), template);
+        await onWebcamEnroll(deviceId, uid, name.trim(), template, role, devices);
         cancelWebcam();
-        setUserId(''); setName('');
+        setUserId(''); setName(''); setAllowedDevices([]);
       }
     } catch (e) {
       showToast(`Enrollment failed: ${e.message}`, 'alert');
@@ -195,7 +195,30 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
           value={userId} onChange={e => setUserId(e.target.value)} />
         <input type="text" className="input" placeholder="Full Name (e.g. John Doe)"
           value={name} onChange={e => setName(e.target.value)} />
+        <select className="select" value={role} onChange={e => setRole(e.target.value)}>
+          <option value="staff">Staff</option>
+          <option value="admin">Admin</option>
+          <option value="visitor">Visitor</option>
+        </select>
       </div>
+
+      {role !== 'admin' && deviceIds.length > 0 && (
+        <div className="edit-field" style={{ marginTop: 4 }}>
+          <label className="edit-label">Allowed devices</label>
+          <div className="device-checkboxes">
+            {deviceIds.map(id => (
+              <label key={id} className="device-checkbox-label">
+                <input type="checkbox" checked={allowedDevices.includes(id)}
+                  onChange={() => toggleAllowedDevice(id)} />
+                <code>{id}</code>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+      {role === 'admin' && (
+        <p className="edit-hint" style={{ marginTop: 4 }}>Admin can access all devices — no device restriction applies.</p>
+      )}
 
       {mode === 'device' && (
         <div>

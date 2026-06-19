@@ -35,10 +35,12 @@ struct UserRecord {
 
 struct MatchResult {
     bool    matched;
+    bool    authorized;       // iris matched AND device is in user's allowedDevices
     char    userId[32];
     char    userName[64];
-    float   score;        // RMS distance — lower = more similar
+    float   score;            // RMS distance — lower = more similar
     uint8_t templateIdx;
+    char    denyReason[32];   // "none" | "no_match" | "unauthorized_device"
 };
 
 class BiometricManager {

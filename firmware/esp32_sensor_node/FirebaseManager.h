@@ -64,8 +64,16 @@ public:
     // ── Biometric logging ────────────────────────────────────────────────────
 
     // Log one sign-in attempt under /signins/{deviceId}/{pushId}
+    // denyReason: "none" | "no_match" | "unauthorized_device"
     void pushSignIn(const char* userId, const char* userName,
-                    float matchScore, bool success, float anomalyScore);
+                    float matchScore, bool success, float anomalyScore,
+                    const char* denyReason = "none");
+
+    // Check whether userId is authorised for this device.
+    // Reads /users/{userId}/role and /users/{userId}/allowedDevices from Firebase.
+    // Returns true if role=="admin" or this device's ID is in allowedDevices.
+    // Falls back to true (allow) when offline so device stays operational.
+    bool checkUserAuthorization(const char* userId);
 
     // Register a new enrolled user under /users/{userId}
     void pushEnrollment(const char* userId, const char* name);

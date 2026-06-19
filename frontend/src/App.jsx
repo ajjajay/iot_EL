@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import WaveCanvas from './components/WaveCanvas.jsx';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { ref, set, push, remove } from 'firebase/database';
+import { ref, set, push, remove, update } from 'firebase/database';
 import { db, auth, DASH_EMAIL, DASH_PASSWORD } from './firebase.js';
 import { useDevices }       from './hooks/useDevices.js';
 import { useReadings }      from './hooks/useReadings.js';
@@ -59,8 +60,45 @@ function Topbar({ anomalyCount, devicesOnline, deviceTotal, theme, onTheme, onRe
   );
 }
 
+function useMouseTracker() {
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.matchMedia('(pointer: coarse)').matches) return;
+
+    const ring = document.createElement('div');
+    ring.style.cssText = [
+      'position:fixed', 'width:28px', 'height:28px',
+      'border:2px solid var(--accent)', 'border-radius:50%',
+      'pointer-events:none', 'z-index:99998',
+      'will-change:transform', 'top:0', 'left:0',
+      'opacity:0.5', 'transition:opacity 0.2s',
+    ].join(';');
+    document.body.appendChild(ring);
+
+    let mx = -100, my = -100, rx = -100, ry = -100;
+    const onMove = e => { mx = e.clientX; my = e.clientY; };
+    window.addEventListener('mousemove', onMove);
+
+    let raf;
+    const tick = () => {
+      rx += (mx - rx) * 0.12;
+      ry += (my - ry) * 0.12;
+      ring.style.transform = `translate(${rx - 14}px,${ry - 14}px)`;
+      raf = requestAnimationFrame(tick);
+    };
+    tick();
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('mousemove', onMove);
+      ring.remove();
+    };
+  }, []);
+}
+
 function AppInner() {
   const showToast = useToast();
+  useMouseTracker();
 
   const [theme,     setTheme]     = useState('light');
   const [isDemo,    setIsDemo]    = useState(false);
@@ -69,6 +107,12 @@ function AppInner() {
   const [tick,      setTick]      = useState(0);
 
   useEffect(() => {
+    if (!auth) {
+      showToast('Firebase not configured — demo mode', 'info');
+      setIsDemo(true);
+      setDemoState(makeDemoState());
+      return;
+    }
     signInWithEmailAndPassword(auth, DASH_EMAIL, DASH_PASSWORD)
       .then(() => { setLiveDb(db); showToast('Connected to Firebase', 'ok'); })
       .catch(err => {
@@ -138,16 +182,35 @@ function AppInner() {
       .catch(e  => showToast(`Remove failed: ${e.message}`, 'alert'));
   }, [isDemo, showToast]);
 
-  const handleSendEnroll = useCallback((deviceId, userId, name) => {
+  const handleUpdateUser = useCallback(async (userId, { role, allowedDevices }) => {
+    const devStr = (allowedDevices ?? []).join(',');
     if (isDemo) {
       setDemoState(prev => ({
         ...prev,
-        users: { ...prev.users, [userId]: { userId, name, deviceId, enrolledAt: Date.now() / 1000, active: true } },
+        users: { ...prev.users, [userId]: { ...prev.users[userId], role, allowedDevices } },
+      }));
+      showToast(`[Demo] ${userId} updated`, 'ok');
+      return;
+    }
+    await update(ref(db, `/users/${userId}`), { role, allowedDevices: devStr })
+      .then(() => showToast(`${userId} updated`, 'ok'))
+      .catch(e  => showToast(`Update failed: ${e.message}`, 'alert'));
+  }, [isDemo, showToast]);
+
+  const handleSendEnroll = useCallback((deviceId, userId, name, role = 'staff', allowedDevices = []) => {
+    const devStr = (allowedDevices ?? []).join(',');
+    if (isDemo) {
+      setDemoState(prev => ({
+        ...prev,
+        users: { ...prev.users, [userId]: { userId, name, deviceId, role, allowedDevices, enrolledAt: Date.now() / 1000, active: true } },
       }));
       showToast(`[Demo] Enrollment command sent for "${name}"`, 'ok');
       return Promise.resolve();
     }
-    return set(ref(db, `/devices/${deviceId}/commands/enroll`), { userId, name, pending: true })
+    return Promise.all([
+      set(ref(db, `/devices/${deviceId}/commands/enroll`), { userId, name, pending: true }),
+      set(ref(db, `/users/${userId}`), { userId, name, deviceId, role, allowedDevices: devStr, enrolledAt: Date.now(), active: true }),
+    ])
       .then(() => showToast(`Enrollment command sent to ${deviceId}`, 'ok'))
       .catch(e  => { showToast(`Command failed: ${e.message}`, 'alert'); throw e; });
   }, [isDemo, showToast]);
@@ -204,21 +267,23 @@ function AppInner() {
     }
   }, [isDemo, showToast]);
 
-  const handleWebcamEnroll = useCallback(async (deviceId, userId, name, template) => {
+  const handleWebcamEnroll = useCallback(async (deviceId, userId, name, template, role = 'staff', allowedDevices = []) => {
+    const devStr = (allowedDevices ?? []).join(',');
     if (isDemo) {
       setDemoState(prev => ({
         ...prev,
-        users: { ...prev.users, [userId]: { userId, name, deviceId, enrolledAt: Date.now(), active: true, template } },
+        users: { ...prev.users, [userId]: { userId, name, deviceId, role, allowedDevices, enrolledAt: Date.now(), active: true, template } },
       }));
       showToast(`[Demo] ${name} enrolled via webcam`, 'ok');
       return;
     }
 
     if (template) {
-      // Local mode: Lambda not in use — save iris template directly to Firebase.
-      await set(ref(db, `/users/${userId}`), { userId, name, deviceId, enrolledAt: Date.now(), active: true, template });
+      await set(ref(db, `/users/${userId}`), { userId, name, deviceId, role, allowedDevices: devStr, enrolledAt: Date.now(), active: true, template });
+    } else {
+      // Rekognition mode: Lambda wrote the record; patch role/allowedDevices on top.
+      await update(ref(db, `/users/${userId}`), { role, allowedDevices: devStr });
     }
-    // Rekognition mode: Lambda already wrote the user record to Firebase (/users/{userId}).
     showToast(`${name} enrolled`, 'ok');
   }, [isDemo, showToast]);
 
@@ -233,52 +298,63 @@ function AppInner() {
   }, [showToast]);
 
   return (
-    <div className="app-layout">
-      <Sidebar anomalyCount={anomalyCount} />
+    <>
+      <WaveCanvas />
 
-      <div className="main-area">
-        <Topbar
-          anomalyCount={anomalyCount}
-          devicesOnline={devicesOnline}
-          deviceTotal={deviceList.length}
-          theme={theme}
-          onTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-          onRefresh={handleRefresh}
-        />
-
-        <main className="content">
-          <Routes>
-            <Route path="/" element={
-              <OverviewPage devices={devices} signins={signins} users={users} alerts={alerts} tick={tick} />
-            } />
-            <Route path="/devices" element={
-              <SensorsPage readings={readings} devices={devices} />
-            } />
-            <Route path="/auth" element={
-              <AuthPage devices={devices} users={users} signins={signins} onResult={handleWebcamAuth} />
-            } />
-            <Route path="/users" element={
-              <UsersPage
-                devices={devices} users={users}
-                onRemove={handleRemoveUser}
-                onSendEnroll={handleSendEnroll}
-                onWebcamEnroll={handleWebcamEnroll}
-              />
-            } />
-            <Route path="/alerts" element={
-              <AlertsPage alerts={alerts} signins={signins} devices={devices} onClear={handleClearAlerts} />
-            } />
-            <Route path="/voice" element={
-              <VoicePage devices={devices} users={users} alerts={alerts} />
-            } />
-            <Route path="/health" element={
-              <HealthPage devices={devices} />
-            } />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </main>
+      <div className="bg-orbs" aria-hidden="true">
+        <div className="bg-orb bg-orb-1" />
+        <div className="bg-orb bg-orb-2" />
+        <div className="bg-orb bg-orb-3" />
       </div>
-    </div>
+
+      <div className="app-layout">
+        <Sidebar anomalyCount={anomalyCount} />
+
+        <div className="main-area">
+          <Topbar
+            anomalyCount={anomalyCount}
+            devicesOnline={devicesOnline}
+            deviceTotal={deviceList.length}
+            theme={theme}
+            onTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+            onRefresh={handleRefresh}
+          />
+
+          <main className="content">
+            <Routes>
+              <Route path="/" element={
+                <OverviewPage devices={devices} signins={signins} users={users} alerts={alerts} tick={tick} />
+              } />
+              <Route path="/devices" element={
+                <SensorsPage readings={readings} devices={devices} />
+              } />
+              <Route path="/auth" element={
+                <AuthPage devices={devices} users={users} signins={signins} onResult={handleWebcamAuth} />
+              } />
+              <Route path="/users" element={
+                <UsersPage
+                  devices={devices} users={users}
+                  onRemove={handleRemoveUser}
+                  onSendEnroll={handleSendEnroll}
+                  onWebcamEnroll={handleWebcamEnroll}
+                  onUpdateUser={handleUpdateUser}
+                />
+              } />
+              <Route path="/alerts" element={
+                <AlertsPage alerts={alerts} signins={signins} devices={devices} onClear={handleClearAlerts} />
+              } />
+              <Route path="/voice" element={
+                <VoicePage devices={devices} users={users} alerts={alerts} />
+              } />
+              <Route path="/health" element={
+                <HealthPage devices={devices} />
+              } />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </main>
+        </div>
+      </div>
+    </>
   );
 }
 

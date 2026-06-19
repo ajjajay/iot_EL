@@ -173,7 +173,7 @@ void FirebaseManager::_enqueue(const SensorReading& s, const MLResult& ml,
 
 void FirebaseManager::pushSignIn(const char* userId, const char* userName,
                                   float matchScore, bool success,
-                                  float anomalyScore) {
+                                  float anomalyScore, const char* denyReason) {
     if (!_connected || !Firebase.ready()) {
         Serial.println("[FB] Offline — sign-in log dropped");
         return;
@@ -182,16 +182,65 @@ void FirebaseManager::pushSignIn(const char* userId, const char* userName,
     FirebaseJson data;
     data.set("userId",      userId);
     data.set("userName",    userName);
+    data.set("deviceId",    _deviceId);
     data.set("matchScore",  matchScore);
     data.set("success",     success);
     data.set("anomalyScore", anomalyScore);
+    data.set("denyReason",  denyReason ? denyReason : "none");
     data.set("ts",          (double)time(nullptr) * 1000.0);
 
     String path = String("/signins/") + _deviceId;
     Firebase.RTDB.push(&_fbData, path.c_str(), &data);
 
-    Serial.printf("[FB] Sign-in logged: user=%s success=%s score=%.3f\n",
-                  userId, success ? "Y" : "N", matchScore);
+    Serial.printf("[FB] Sign-in logged: user=%s success=%s score=%.3f deny=%s\n",
+                  userId, success ? "Y" : "N", matchScore,
+                  denyReason ? denyReason : "none");
+}
+
+bool FirebaseManager::checkUserAuthorization(const char* userId) {
+    if (!_connected || !Firebase.ready()) {
+        // Offline — allow access so device stays operational
+        Serial.println("[AUTH] Offline — granting access by default");
+        return true;
+    }
+
+    char role[16]     = "staff";
+    char devices[256] = "";
+
+    // Read role
+    String rolePath = String("/users/") + userId + "/role";
+    if (Firebase.RTDB.getString(&_fbDataRead, rolePath.c_str())) {
+        strlcpy(role, _fbDataRead.stringData().c_str(), sizeof(role));
+    }
+    Serial.printf("[AUTH] User '%s' role='%s'\n", userId, role);
+
+    // Admin can open any door
+    if (strcmp(role, "admin") == 0) return true;
+
+    // Read allowedDevices (comma-separated string, e.g. "esp32_node_01,esp32_node_02")
+    String devPath = String("/users/") + userId + "/allowedDevices";
+    if (!Firebase.RTDB.getString(&_fbDataRead, devPath.c_str())) {
+        Serial.printf("[AUTH] No allowedDevices for '%s' — denying\n", userId);
+        return false;
+    }
+    strlcpy(devices, _fbDataRead.stringData().c_str(), sizeof(devices));
+    Serial.printf("[AUTH] allowedDevices='%s' thisDevice='%s'\n", devices, _deviceId);
+
+    // Check _deviceId appears as a full comma-delimited token
+    const char* p = devices;
+    size_t dlen = strlen(_deviceId);
+    while ((p = strstr(p, _deviceId)) != nullptr) {
+        bool startOk = (p == devices) || *(p - 1) == ',';
+        bool endOk   = *(p + dlen) == '\0' || *(p + dlen) == ',';
+        if (startOk && endOk) {
+            Serial.printf("[AUTH] '%s' authorized for '%s'\n", userId, _deviceId);
+            return true;
+        }
+        p++;
+    }
+
+    Serial.printf("[AUTH] '%s' NOT authorized for device '%s'\n", userId, _deviceId);
+    return false;
 }
 
 void FirebaseManager::pushEnrollment(const char* userId, const char* name) {

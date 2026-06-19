@@ -18,30 +18,32 @@ export function makeDemoState() {
   };
 
   const users = {
-    aditya_s:    { userId: "aditya_s",    name: "Aditya Sridhar",  deviceId: "esp32_node_01", enrolledAt: now / 1000 - 172800, active: true,  avatarUrl: "https://i.pravatar.cc/80?img=12" },
-    rahul_s:     { userId: "rahul_s",     name: "Rahul Sharma",    deviceId: "esp32_node_01", enrolledAt: now / 1000 - 86400,  active: true,  avatarUrl: "https://i.pravatar.cc/80?img=15" },
-    priya_p:     { userId: "priya_p",     name: "Priya Patel",     deviceId: "esp32_node_02", enrolledAt: now / 1000 - 72000,  active: true,  avatarUrl: "https://i.pravatar.cc/80?img=47" },
-    alex_c:      { userId: "alex_c",      name: "Alex Chen",       deviceId: "esp32_node_01", enrolledAt: now / 1000 - 50000,  active: true,  avatarUrl: "https://i.pravatar.cc/80?img=7"  },
-    sarah_j:     { userId: "sarah_j",     name: "Sarah Johnson",   deviceId: "esp32_node_02", enrolledAt: now / 1000 - 36000,  active: true,  avatarUrl: "https://i.pravatar.cc/80?img=44" },
-    mohammed_a:  { userId: "mohammed_a",  name: "Mohammed Ali",    deviceId: "esp32_node_01", enrolledAt: now / 1000 - 21600,  active: true,  avatarUrl: "https://i.pravatar.cc/80?img=59" },
-    emma_w:      { userId: "emma_w",      name: "Emma Wilson",     deviceId: "esp32_node_02", enrolledAt: now / 1000 - 14400,  active: false, avatarUrl: "https://i.pravatar.cc/80?img=38" },
-    david_k:     { userId: "david_k",     name: "David Kim",       deviceId: "esp32_node_01", enrolledAt: now / 1000 - 7200,   active: true,  avatarUrl: "https://i.pravatar.cc/80?img=53" },
+    aditya_s:    { userId: "aditya_s",   name: "Aditya Sridhar", deviceId: "esp32_node_01", enrolledAt: now / 1000 - 172800, active: true,  role: "admin",   allowedDevices: ["esp32_node_01","esp32_node_02"], avatarUrl: "https://i.pravatar.cc/80?img=12" },
+    rahul_s:     { userId: "rahul_s",    name: "Rahul Sharma",   deviceId: "esp32_node_01", enrolledAt: now / 1000 - 86400,  active: true,  role: "staff",   allowedDevices: ["esp32_node_01"],                 avatarUrl: "https://i.pravatar.cc/80?img=15" },
+    priya_p:     { userId: "priya_p",    name: "Priya Patel",    deviceId: "esp32_node_02", enrolledAt: now / 1000 - 72000,  active: true,  role: "staff",   allowedDevices: ["esp32_node_02"],                 avatarUrl: "https://i.pravatar.cc/80?img=47" },
+    alex_c:      { userId: "alex_c",     name: "Alex Chen",      deviceId: "esp32_node_01", enrolledAt: now / 1000 - 50000,  active: true,  role: "visitor", allowedDevices: ["esp32_node_01"],                 avatarUrl: "https://i.pravatar.cc/80?img=7"  },
+    sarah_j:     { userId: "sarah_j",    name: "Sarah Johnson",  deviceId: "esp32_node_02", enrolledAt: now / 1000 - 36000,  active: true,  role: "staff",   allowedDevices: ["esp32_node_01","esp32_node_02"], avatarUrl: "https://i.pravatar.cc/80?img=44" },
+    mohammed_a:  { userId: "mohammed_a", name: "Mohammed Ali",   deviceId: "esp32_node_01", enrolledAt: now / 1000 - 21600,  active: true,  role: "visitor", allowedDevices: ["esp32_node_01"],                 avatarUrl: "https://i.pravatar.cc/80?img=59" },
+    emma_w:      { userId: "emma_w",     name: "Emma Wilson",    deviceId: "esp32_node_02", enrolledAt: now / 1000 - 14400,  active: false, role: "visitor", allowedDevices: ["esp32_node_02"],                 avatarUrl: "https://i.pravatar.cc/80?img=38" },
+    david_k:     { userId: "david_k",    name: "David Kim",      deviceId: "esp32_node_01", enrolledAt: now / 1000 - 7200,   active: true,  role: "staff",   allowedDevices: ["esp32_node_01"],                 avatarUrl: "https://i.pravatar.cc/80?img=53" },
   };
 
   const signins = {
     esp32_node_01: [
-      { userId: "aditya_s",   userName: "Aditya Sridhar",  matchScore: 0.09, success: true,  anomalyScore: 0.04, ts: now / 1000 - 180,  deviceId: "esp32_node_01" },
-      { userId: "rahul_s",    userName: "Rahul Sharma",    matchScore: 0.14, success: true,  anomalyScore: 0.06, ts: now / 1000 - 420,  deviceId: "esp32_node_01" },
-      { userId: "unknown",    userName: "Unknown",         matchScore: 0.71, success: false, anomalyScore: 0.60, ts: now / 1000 - 660,  deviceId: "esp32_node_01" },
-      { userId: "alex_c",     userName: "Alex Chen",       matchScore: 0.21, success: true,  anomalyScore: 0.08, ts: now / 1000 - 900,  deviceId: "esp32_node_01" },
-      { userId: "unknown",    userName: "Unknown",         matchScore: 0.68, success: false, anomalyScore: 0.85, ts: now / 1000 - 1100, deviceId: "esp32_node_01" },
-      { userId: "david_k",    userName: "David Kim",       matchScore: 0.17, success: true,  anomalyScore: 0.03, ts: now / 1000 - 3600, deviceId: "esp32_node_01" },
-      { userId: "mohammed_a", userName: "Mohammed Ali",    matchScore: 0.11, success: true,  anomalyScore: 0.05, ts: now / 1000 - 7200, deviceId: "esp32_node_01" },
+      { userId: "aditya_s",   userName: "Aditya Sridhar", matchScore: 0.09, success: true,  anomalyScore: 0.04, denyReason: "none",                 ts: now / 1000 - 180,  deviceId: "esp32_node_01" },
+      { userId: "rahul_s",    userName: "Rahul Sharma",   matchScore: 0.14, success: true,  anomalyScore: 0.06, denyReason: "none",                 ts: now / 1000 - 420,  deviceId: "esp32_node_01" },
+      { userId: "unknown",    userName: "Unknown",        matchScore: 0.71, success: false, anomalyScore: 0.60, denyReason: "no_match",             ts: now / 1000 - 660,  deviceId: "esp32_node_01" },
+      { userId: "priya_p",    userName: "Priya Patel",    matchScore: 0.18, success: false, anomalyScore: 0.10, denyReason: "unauthorized_device",  ts: now / 1000 - 800,  deviceId: "esp32_node_01" },
+      { userId: "alex_c",     userName: "Alex Chen",      matchScore: 0.21, success: true,  anomalyScore: 0.08, denyReason: "none",                 ts: now / 1000 - 900,  deviceId: "esp32_node_01" },
+      { userId: "unknown",    userName: "Unknown",        matchScore: 0.68, success: false, anomalyScore: 0.85, denyReason: "no_match",             ts: now / 1000 - 1100, deviceId: "esp32_node_01" },
+      { userId: "david_k",    userName: "David Kim",      matchScore: 0.17, success: true,  anomalyScore: 0.03, denyReason: "none",                 ts: now / 1000 - 3600, deviceId: "esp32_node_01" },
+      { userId: "mohammed_a", userName: "Mohammed Ali",   matchScore: 0.11, success: true,  anomalyScore: 0.05, denyReason: "none",                 ts: now / 1000 - 7200, deviceId: "esp32_node_01" },
     ],
     esp32_node_02: [
-      { userId: "priya_p",    userName: "Priya Patel",     matchScore: 0.13, success: true,  anomalyScore: 0.04, ts: now / 1000 - 240,  deviceId: "esp32_node_02" },
-      { userId: "sarah_j",    userName: "Sarah Johnson",   matchScore: 0.19, success: true,  anomalyScore: 0.07, ts: now / 1000 - 720,  deviceId: "esp32_node_02" },
-      { userId: "unknown",    userName: "Unknown",         matchScore: 0.74, success: false, anomalyScore: 0.72, ts: now / 1000 - 1200, deviceId: "esp32_node_02" },
+      { userId: "priya_p",    userName: "Priya Patel",    matchScore: 0.13, success: true,  anomalyScore: 0.04, denyReason: "none",                 ts: now / 1000 - 240,  deviceId: "esp32_node_02" },
+      { userId: "sarah_j",    userName: "Sarah Johnson",  matchScore: 0.19, success: true,  anomalyScore: 0.07, denyReason: "none",                 ts: now / 1000 - 720,  deviceId: "esp32_node_02" },
+      { userId: "unknown",    userName: "Unknown",        matchScore: 0.74, success: false, anomalyScore: 0.72, denyReason: "no_match",             ts: now / 1000 - 1200, deviceId: "esp32_node_02" },
+      { userId: "rahul_s",    userName: "Rahul Sharma",   matchScore: 0.16, success: false, anomalyScore: 0.08, denyReason: "unauthorized_device",  ts: now / 1000 - 2400, deviceId: "esp32_node_02" },
     ],
   };
 

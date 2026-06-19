@@ -195,10 +195,26 @@ static void handleIrisAuth(const DeviceConfig& c) {
     MatchResult result = biometric->match(iris, c.irisMatchThreshold);
 
     if (result.matched) {
+        // ── Device-level authorisation check ──────────────────────────────────
+        bool authorized = firebase->checkUserAuthorization(result.userId);
+        if (!authorized) {
+            fsm.transition(DeviceState::REJECTED);
+            float anomScore = anomaly->record(result, false);
+            firebase->pushSignIn(result.userId, result.userName, result.score,
+                                 false, anomScore, "unauthorized_device");
+            if (awsIoT && awsIoT->isConnected())
+                awsIoT->publishBiometricEvent(result.userId, result.score, false,
+                                              storagePath.c_str());
+            lcd->showAuth(false, "Unauthorized");
+            Serial.printf("[AUTH] '%s' iris OK but not authorized for this door\n",
+                          result.userId);
+            return;
+        }
+        // ── Authorized ────────────────────────────────────────────────────────
         fsm.transition(DeviceState::AUTHENTICATED);
         float anomScore = anomaly->record(result, true);
-        firebase->pushSignIn(result.userId, result.userName, result.score, true, anomScore);
-        // Publish to AWS — Lambda runs Rekognition, anomaly check, logs, SNS if needed
+        firebase->pushSignIn(result.userId, result.userName, result.score,
+                             true, anomScore, "none");
         if (awsIoT && awsIoT->isConnected())
             awsIoT->publishBiometricEvent(result.userId, result.score, true,
                                           storagePath.c_str());
@@ -212,8 +228,7 @@ static void handleIrisAuth(const DeviceConfig& c) {
         float anomScore = anomaly->record(result, false);
         const char* uid  = result.userId[0]   ? result.userId   : "unknown";
         const char* unam = result.userName[0] ? result.userName : "Unknown";
-        firebase->pushSignIn(uid, unam, result.score, false, anomScore);
-        // Even on local rejection, publish to Lambda — Rekognition may still identify them
+        firebase->pushSignIn(uid, unam, result.score, false, anomScore, "no_match");
         if (awsIoT && awsIoT->isConnected())
             awsIoT->publishBiometricEvent(uid, result.score, false, storagePath.c_str());
         if (anomaly->bruteForceScore() >= c.anomalyScoreThreshold)

@@ -36,15 +36,21 @@ export default function SignInLog({ signins, devices }) {
           <thead>
             <tr>
               <th>Time</th><th>Device</th><th>User</th>
-              <th>Match Score</th><th>Result</th><th>Anomaly</th>
+              <th>Match Score</th><th>Result</th><th>Deny Reason</th><th>Anomaly</th>
             </tr>
           </thead>
           <tbody id="signinTableBody">
             {rows.length === 0 ? (
-              <tr><td colSpan="6" className="table-empty">No sign-ins recorded yet</td></tr>
+              <tr><td colSpan="7" className="table-empty">No sign-ins recorded yet</td></tr>
             ) : rows.map((ev, i) => {
               const ts        = formatTsMs(ev.ts);
               const anomClass = ev.anomalyScore >= 0.6 ? 'anomaly-high' : ev.anomalyScore >= 0.3 ? 'anomaly-med' : '';
+              const deny      = ev.denyReason;
+              const denyEl    = !ev.success && deny && deny !== 'none'
+                ? <span className={`deny-badge ${deny === 'unauthorized_device' ? 'deny-authz' : 'deny-nomatch'}`}>
+                    {deny === 'unauthorized_device' ? '⛔ Unauthorized' : '❌ No Match'}
+                  </span>
+                : <span className="deny-badge deny-none">{ev.success ? '—' : '❌ No Match'}</span>;
               return (
                 <tr key={i}>
                   <td>{ts}</td>
@@ -56,6 +62,7 @@ export default function SignInLog({ signins, devices }) {
                       {ev.success ? '✓ Granted' : '✗ Denied'}
                     </span>
                   </td>
+                  <td>{denyEl}</td>
                   <td>
                     <span className={`anomaly-badge ${anomClass}`}>
                       {ev.anomalyScore != null ? `${(ev.anomalyScore * 100).toFixed(0)}%` : '—'}
