@@ -15,6 +15,11 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/phone-cam': {
+        target: 'http://192.168.1.3:8080',
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/phone-cam/, ''),
+      },
     },
   },
 });

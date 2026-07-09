@@ -15,6 +15,7 @@ AWSIoTManager::AWSIoTManager(const char* endpoint, const char* thingName,
     _wifiClient.setCACert(rootCA);
     _wifiClient.setCertificate(deviceCert);
     _wifiClient.setPrivateKey(privateKey);
+    _wifiClient.setAlpnProtocols(new const char*[2]{"x-amzn-mqtt-ca", nullptr});
 }
 
 bool AWSIoTManager::begin() {

@@ -1,0 +1,6 @@
+{
+    "Variables":  {
+                      "AWS_REGION_NAME":  "ap-south-1",
+                      "ALERT_SNS_TOPIC_ARN":  "arn:aws:sns:ap-south-1:983401047867:iot-biometric-alerts"
+                  }
+}

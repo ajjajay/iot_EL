@@ -7,7 +7,7 @@ char KeypadManager::_keys[4][3] = {
     {'*', '0', '#'}
 };
 
-byte KeypadManager::_rowPins[4] = {14, 12, 13, 27};
+byte KeypadManager::_rowPins[4] = {13, 12, 14, 27};
 byte KeypadManager::_colPins[3] = {26, 25, 33};
 
 KeypadManager::KeypadManager()

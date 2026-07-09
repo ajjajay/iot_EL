@@ -97,6 +97,9 @@ public:
     // Called when the user triple-presses the QR button on the keypad.
     void requestQrCode();
 
+    // Set /devices/{deviceId}/commands/qrUnlocked = true/false
+    void setQrUnlocked(bool unlocked);
+
     bool isConnected() const { return _connected; }
 
 private:

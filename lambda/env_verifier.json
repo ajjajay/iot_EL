@@ -1,0 +1,8 @@
+{
+    "Variables":  {
+                      "FACE_MATCH_THRESHOLD":  "80.0",
+                      "AWS_REGION_NAME":  "ap-south-1",
+                      "FACE_IMAGE_BUCKET":  "",
+                      "REKOGNITION_COLLECTION_ID":  "iot-biometric-faces"
+                  }
+}

@@ -1,0 +1,7 @@
+{
+    "Variables":  {
+                      "FACE_IMAGE_BUCKET":  "",
+                      "AWS_REGION_NAME":  "ap-south-1",
+                      "REKOGNITION_COLLECTION_ID":  "iot-biometric-faces"
+                  }
+}

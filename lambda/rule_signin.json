@@ -1,0 +1,13 @@
+{
+    "actions":  [
+                    {
+                        "lambda":  {
+                                       "functionArn":  "arn:aws:lambda:ap-south-1:983401047867:function:biometric_pipeline"
+                                   }
+                    }
+                ],
+    "awsIotSqlVersion":  "2016-03-23",
+    "sql":  "SELECT *, topic(2) as deviceId FROM \u0027iot/+/biometric/signin\u0027",
+    "description":  "Route biometric sign-in events to biometric_pipeline Lambda",
+    "ruleDisabled":  false
+}

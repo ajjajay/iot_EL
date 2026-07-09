@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ref, onValue } from 'firebase/database';
+import { ref, onValue, set } from 'firebase/database';
 import { db } from '../firebase.js';
 import { useToast } from './ToastContainer.jsx';
 import jsQR from 'jsqr';
@@ -15,7 +15,8 @@ export default function QrPanel({ devices }) {
   const [result,     setResult]     = useState(null);
   const [camErr,     setCamErr]     = useState('');
   const [detected,   setDetected]   = useState('');
-  const [qrData,     setQrData]     = useState(null);  // { qrBase64, token, expiresIn }
+  const [qrData,     setQrData]     = useState(null);  // { emailSent, expiresIn }
+  const [qrUnlocked, setQrUnlocked] = useState(false);
 
   const videoRef   = useRef(null);
   const canvasRef  = useRef(null);
@@ -39,6 +40,16 @@ export default function QrPanel({ devices }) {
     return () => unsub();
   }, [deviceId]);
 
+  // Listen for keypad QR password unlock → show/hide Generate button
+  useEffect(() => {
+    if (!deviceId || !db) return;
+    const path = ref(db, `/devices/${deviceId}/commands/qrUnlocked`);
+    const unsub = onValue(path, snap => {
+      setQrUnlocked(snap.val() === true);
+    });
+    return () => { unsub(); setQrUnlocked(false); };
+  }, [deviceId]);
+
   useEffect(() => () => stopCamera(), []);
 
   // ── Camera / QR scan ────────────────────────────────────────────────────────
@@ -59,15 +70,16 @@ export default function QrPanel({ devices }) {
     }
     try {
       const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },   // rear cam on mobile
+        video: { facingMode: { ideal: 'environment' } },  // rear cam on mobile, front on desktop
         audio: false,
       });
       streamRef.current = s;
       setScanning(true);
     } catch (err) {
       setCamErr(
-        err.name === 'NotAllowedError' ? 'Camera permission denied.' :
-        err.name === 'NotFoundError'   ? 'No camera found.'          :
+        err.name === 'NotAllowedError'  ? 'Camera permission denied.' :
+        err.name === 'NotFoundError'    ? 'No camera found.'          :
+        err.name === 'NotReadableError' ? 'Camera in use by another app or tab — close it and try again.' :
         `Camera error: ${err.message}`
       );
     }
@@ -132,7 +144,12 @@ export default function QrPanel({ devices }) {
       if (!resp.ok) throw new Error(`Server error ${resp.status}`);
       const data = await resp.json();
       setQrData(data);
-      showToast('QR code ready — scan it below or type the code manually', 'ok');
+      // Reset the keypad unlock so the button hides again after use
+      if (db && id) {
+        set(ref(db, `/devices/${id}/commands/qrUnlocked`), false).catch(() => {});
+      }
+      showToast(data.emailSent ? 'QR code emailed — open camera to scan it' : 'QR generated — open camera to scan', 'ok');
+      openScanner();
     } catch (e) {
       showToast(`Request failed: ${e.message}`, 'alert');
     } finally {
@@ -173,9 +190,10 @@ export default function QrPanel({ devices }) {
     <div className="enroll-panel" style={{ marginTop: '1.5rem' }}>
       <h3 className="enroll-title">QR Code Fallback Access</h3>
       <p className="section-subtitle">
-        When facial recognition fails — generate a one-time QR code, then scan it
-        with your camera or type the code manually to unlock. The ESP32 keypad
-        (press <b>2</b> three times) can also trigger a QR request automatically.
+        When facial recognition fails — press <b>*</b> on the keypad, enter the
+        4-digit password to unlock this panel, then generate a one-time QR code.
+        It will be emailed to the authorised recipient who shows it on their phone.
+        Use the camera here to scan it and unlock.
       </p>
 
       {/* Device selector */}
@@ -186,58 +204,40 @@ export default function QrPanel({ devices }) {
         </select>
       </div>
 
-      {/* Step 1 — generate QR */}
+      {/* Step 1 — generate QR (only visible after keypad password) */}
       <div style={{ marginTop: '0.75rem' }}>
-        <button
-          className="btn btn-primary"
-          onClick={() => handleRequest()}
-          disabled={requesting || !deviceId}
-        >
-          {requesting ? 'Generating…' : '🔑 Generate QR Code'}
-        </button>
+        {qrUnlocked ? (
+          <button
+            className="btn btn-primary"
+            onClick={() => handleRequest()}
+            disabled={requesting || !deviceId}
+          >
+            {requesting ? 'Generating…' : '🔑 Generate QR Code'}
+          </button>
+        ) : (
+          <p style={{ color: 'var(--color-muted, #888)', fontSize: '0.85rem', margin: 0 }}>
+            🔒 Press <b>*</b> on the keypad then enter the 4-digit password to unlock QR access.
+          </p>
+        )}
       </div>
 
-      {/* QR image + manual token display */}
-      {qrData && !result && (
-        <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
-          <img
-            src={`data:image/png;base64,${qrData.qrBase64}`}
-            alt="QR Code"
-            style={{ width: 180, height: 180, imageRendering: 'pixelated', border: '2px solid var(--color-border)', borderRadius: 8 }}
-          />
-          <p style={{ fontFamily: 'monospace', fontSize: '1.4rem', letterSpacing: '4px', fontWeight: 'bold', margin: 0 }}>
-            {qrData.token}
-          </p>
-          {qrData.emailSent && (
-            <p style={{ color: 'var(--color-ok, #22c55e)', fontSize: '0.82rem', margin: 0 }}>
-              ✓ QR code also sent to your email
-            </p>
-          )}
-          <p style={{ color: 'var(--color-muted)', fontSize: '0.8rem', margin: 0 }}>
-            Expires in {qrData.expiresIn}s · scan the QR or type the code below
-          </p>
-        </div>
-      )}
-
-      {/* Step 2 — scan or type */}
+      {/* Step 2 — camera scanner (auto-opens after generating) */}
       {qrData && !result && (
         <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {qrData.emailSent && (
+            <p style={{ color: 'var(--color-ok, #22c55e)', fontSize: '0.85rem', margin: 0, width: '100%' }}>
+              ✓ QR code sent to email — ask recipient to show it, then scan below
+            </p>
+          )}
           {!scanning ? (
             <button className="btn btn-primary" onClick={openScanner} disabled={!deviceId}>
-              📷 Scan with Camera
+              📷 Open Camera to Scan
             </button>
           ) : (
             <button className="btn btn-danger-outline btn-sm" onClick={closeScanner}>
               Cancel Scan
             </button>
           )}
-          <button
-            className="btn btn-primary"
-            onClick={() => verifyToken(qrData.token)}
-            disabled={!deviceId}
-          >
-            ✓ Use This Code
-          </button>
         </div>
       )}
 

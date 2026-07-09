@@ -53,7 +53,7 @@ def _send_email(token: str, device_id: str, qr_b64: str) -> None:
     qr_png = base64.b64decode(qr_b64)
     msg = MIMEMultipart("related")
     msg["Subject"] = f"[IoT Access] QR Code — {device_id}"
-    msg["From"]    = _GMAIL_USER
+    msg["From"]    = f"iotEl <{_GMAIL_USER}>"
     msg["To"]      = _NOTIFY_EMAIL
     msg.attach(MIMEText(f"""
     <html><body style="font-family:sans-serif;max-width:480px;margin:auto">

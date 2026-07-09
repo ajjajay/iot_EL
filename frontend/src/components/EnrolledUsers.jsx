@@ -41,7 +41,7 @@ function UserCard({ u, deviceIds, onRemove, onUpdateUser }) {
     setEditing(false);
   }
 
-  const allowed = u.allowedDevices ?? (u.deviceId ? [u.deviceId] : []);
+  const allowed = Array.isArray(u.allowedDevices) ? u.allowedDevices : (u.deviceId ? [u.deviceId] : []);
 
   return (
     <div className={`enrolled-card${u.active === false ? ' enrolled-card--inactive' : ''}${editing ? ' enrolled-card--editing' : ''}`}>

@@ -62,9 +62,9 @@ void ConfigManager::_applyDefaults() {
     _cfg.mlRiskThreshold = 0.6f;
 
     // AWS IoT Core
-    strlcpy(_cfg.awsEndpoint,  "", sizeof(_cfg.awsEndpoint));
-    strlcpy(_cfg.awsThingName, "", sizeof(_cfg.awsThingName));
-    _cfg.awsEnabled = false;
+    strlcpy(_cfg.awsEndpoint,  "alujclnuzcxng-ats.iot.ap-south-1.amazonaws.com", sizeof(_cfg.awsEndpoint));
+    strlcpy(_cfg.awsThingName, "esp32_node_01", sizeof(_cfg.awsThingName));
+    _cfg.awsEnabled = true;
 
     // Biometric / Iris (only relevant when cameraEnabled = true)
     _cfg.cameraEnabled      = false;

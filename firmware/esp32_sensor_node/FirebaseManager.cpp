@@ -418,6 +418,15 @@ void FirebaseManager::requestQrCode() {
     }
 }
 
+void FirebaseManager::setQrUnlocked(bool unlocked) {
+    String path = _devicePath() + "/commands/qrUnlocked";
+    if (Firebase.RTDB.setBool(&_fbData, path.c_str(), unlocked)) {
+        Serial.printf("[FB] qrUnlocked set to %s\n", unlocked ? "true" : "false");
+    } else {
+        Serial.printf("[FB] setQrUnlocked failed: %s\n", _fbData.errorReason().c_str());
+    }
+}
+
 // ── Path helpers ──────────────────────────────────────────────────────────────
 
 String FirebaseManager::_devicePath() const {

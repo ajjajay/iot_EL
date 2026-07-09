@@ -22,7 +22,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from ml_model import AmbientRiskModel
-from routers import devices, alerts, signins, users, voice, predict, stream, qr
+from routers import devices, alerts, signins, users, voice, predict, stream, qr, auth
 
 # ── Startup ───────────────────────────────────────────────────────────────────
 
@@ -70,7 +70,8 @@ app.include_router(signins.router, prefix="/api")
 app.include_router(users.router,   prefix="/api")
 app.include_router(voice.router,   prefix="/api")
 app.include_router(stream.router,  prefix="/api")
-app.include_router(qr.router,     prefix="/api")
+app.include_router(qr.router,      prefix="/api")
+app.include_router(auth.router,    prefix="/api")
 
 # ── Health ────────────────────────────────────────────────────────────────────
 

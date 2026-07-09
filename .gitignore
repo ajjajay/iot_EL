@@ -84,6 +84,7 @@ lambda/**/package/
 # AWS IoT certificates — NEVER commit these (private key + device cert)
 aws_certificates.h
 **/aws_certificates.h
+aws_certs/
 
 # ESP32 SPIFFS config — contains WiFi + Firebase credentials
 data/config.json

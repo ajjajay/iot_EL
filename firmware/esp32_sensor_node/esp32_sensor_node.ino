@@ -90,6 +90,14 @@ unsigned long qrFirstPressMs = 0;
 static constexpr uint8_t  QR_PRESS_TARGET = 3;
 static constexpr uint32_t QR_PRESS_WINDOW = 5000;  // ms
 
+// ── QR keypad password state ──────────────────────────────────────────────────
+char          qrPassBuf[5]   = {};
+uint8_t       qrPassLen      = 0;
+bool          qrPassWaiting  = false;
+unsigned long qrPassStartMs  = 0;
+static constexpr char     QR_PASSWORD[]    = "1245";
+static constexpr uint32_t QR_PASS_TIMEOUT  = 30000; // ms
+
 // ── Dashboard sign-in tracking ────────────────────────────────────────────────
 double        lastSignInTs      = 0;
 unsigned long lastSignInPollMs  = 0;
@@ -171,18 +179,7 @@ static void handleEnrolling(const DeviceConfig& c) {
 static void handleIrisAuth(const DeviceConfig& c) {
     lcd->showMessage("Scanning iris...", "");
 
-    // 1. Capture JPEG for Rekognition (upload before local matching)
-    String storagePath = "";
-    JpegCapture jpeg = camera->captureJpeg();
-    if (jpeg.valid) {
-        String path = String("signins/") + c.deviceId + "/" + String(millis()) + ".jpg";
-        storagePath = firebase->uploadJpegToStorage(jpeg.buf, jpeg.len, path);
-        IrisCamera::freeJpeg(jpeg);
-    } else {
-        Serial.println("[AUTH] JPEG capture failed — Rekognition will be skipped by Lambda");
-    }
-
-    // 2. Capture features for local matching
+    // 1. Local feature capture + match (fast, on-device — no network)
     IrisCapture iris = camera->capture();
 
     if (!iris.valid) {
@@ -194,24 +191,41 @@ static void handleIrisAuth(const DeviceConfig& c) {
 
     MatchResult result = biometric->match(iris, c.irisMatchThreshold);
 
+    // 2. Device-level authorisation check (needed before decision)
+    bool granted = false;
+    bool unauthorized = false;
     if (result.matched) {
-        // ── Device-level authorisation check ──────────────────────────────────
         bool authorized = firebase->checkUserAuthorization(result.userId);
-        if (!authorized) {
-            fsm.transition(DeviceState::REJECTED);
-            float anomScore = anomaly->record(result, false);
-            firebase->pushSignIn(result.userId, result.userName, result.score,
-                                 false, anomScore, "unauthorized_device");
-            if (awsIoT && awsIoT->isConnected())
-                awsIoT->publishBiometricEvent(result.userId, result.score, false,
-                                              storagePath.c_str());
-            lcd->showAuth(false, "Unauthorized");
+        if (authorized) {
+            granted = true;
+        } else {
+            unauthorized = true;
             Serial.printf("[AUTH] '%s' iris OK but not authorized for this door\n",
                           result.userId);
-            return;
         }
-        // ── Authorized ────────────────────────────────────────────────────────
+    }
+
+    // 3. Update FSM + LCD immediately — user sees result without waiting for upload
+    if (granted) {
         fsm.transition(DeviceState::AUTHENTICATED);
+        lcd->showAuth(true, result.userName);
+    } else {
+        fsm.transition(DeviceState::REJECTED);
+        lcd->showAuth(false, unauthorized ? "Unauthorized" : "No match");
+    }
+
+    // 4. Cloud logging (JPEG upload + Firebase push + AWS publish) — after LCD update
+    String storagePath = "";
+    JpegCapture jpeg = camera->captureJpeg();
+    if (jpeg.valid) {
+        String path = String("signins/") + c.deviceId + "/" + String(millis()) + ".jpg";
+        storagePath = firebase->uploadJpegToStorage(jpeg.buf, jpeg.len, path);
+        IrisCamera::freeJpeg(jpeg);
+    } else {
+        Serial.println("[AUTH] JPEG capture failed — Rekognition will be skipped by Lambda");
+    }
+
+    if (granted) {
         float anomScore = anomaly->record(result, true);
         firebase->pushSignIn(result.userId, result.userName, result.score,
                              true, anomScore, "none");
@@ -222,9 +236,14 @@ static void handleIrisAuth(const DeviceConfig& c) {
             const char* t = anomaly->consecutiveFailures() >= 5 ? "brute_force" : "suspicious_signin";
             alertMgr->sendAnomaly(result.userId, anomScore, t);
         }
-        lcd->showAuth(true, result.userName);
+    } else if (unauthorized) {
+        float anomScore = anomaly->record(result, false);
+        firebase->pushSignIn(result.userId, result.userName, result.score,
+                             false, anomScore, "unauthorized_device");
+        if (awsIoT && awsIoT->isConnected())
+            awsIoT->publishBiometricEvent(result.userId, result.score, false,
+                                          storagePath.c_str());
     } else {
-        fsm.transition(DeviceState::REJECTED);
         float anomScore = anomaly->record(result, false);
         const char* uid  = result.userId[0]   ? result.userId   : "unknown";
         const char* unam = result.userName[0] ? result.userName : "Unknown";
@@ -233,7 +252,6 @@ static void handleIrisAuth(const DeviceConfig& c) {
             awsIoT->publishBiometricEvent(uid, result.score, false, storagePath.c_str());
         if (anomaly->bruteForceScore() >= c.anomalyScoreThreshold)
             alertMgr->sendAnomaly("unknown", anomaly->bruteForceScore(), "brute_force");
-        lcd->showAuth(false, "No match");
     }
 }
 
@@ -298,7 +316,7 @@ static void handlePinAuth(const DeviceConfig& c) {
 void setup() {
     Serial.begin(115200);
     delay(500);
-    Serial.println("\n=== Iris Biometric Access Control — Boot ===");
+    Serial.println("\n=== Iris Biometric Access Control — Boot v2 ===");
 
     config.load();
     const DeviceConfig& c = config.cfg();
@@ -377,9 +395,10 @@ void setup() {
         delay(1000);
     }
 
-    // AWS IoT Core
-    if (c.awsEnabled && wifiOk) {
-        awsIoT = new AWSIoTManager(c.awsEndpoint, c.awsThingName,
+    // AWS IoT Core — hardcoded, bypasses config.json
+    if (wifiOk) {
+        awsIoT = new AWSIoTManager("alujclnuzcxng-ats.iot.ap-south-1.amazonaws.com",
+                                   "esp32_node_01",
                                    AWS_ROOT_CA, AWS_DEVICE_CERT, AWS_PRIVATE_KEY);
         if (!awsIoT->begin()) {
             Serial.println("[BOOT] AWS IoT connect failed — retried each loop");
@@ -460,7 +479,7 @@ void loop() {
     if (state == DeviceState::MONITORING) {
 
         // Poll dashboard sign-ins every 5 s — always runs, even while displaying
-        if (now - lastSignInPollMs >= 5000) {
+        if (now - lastSignInPollMs >= 1000) {
             lastSignInPollMs = now;
             char   siName[32];
             bool   siSuccess;
@@ -482,9 +501,56 @@ void loop() {
             return;
         }
 
-        // Keypad: '2' × 3 within 5 s → request QR code; any other key → PIN auth
+        // Keypad handling
         char key = keypad->getKey();
-        if (key == '2') {
+
+        // ── QR password mode (entered via '*') ───────────────────────────────
+        if (qrPassWaiting) {
+            if (now - qrPassStartMs > QR_PASS_TIMEOUT) {
+                qrPassWaiting = false;
+                qrPassLen     = 0;
+                memset(qrPassBuf, 0, sizeof(qrPassBuf));
+                lcd->showMessage("Pass timeout", "");
+                delay(1500);
+                return;
+            }
+            if (key == '\0') return;
+            // Accept digit keys only
+            if ((key >= '0' && key <= '9')) {
+                qrPassBuf[qrPassLen++] = key;
+                char masked[5] = {};
+                for (uint8_t i = 0; i < qrPassLen; i++) masked[i] = '*';
+                masked[qrPassLen] = '\0';
+                lcd->showMessage("QR Pass:", masked);
+                if (qrPassLen >= 4) {
+                    qrPassWaiting = false;
+                    bool correct = (qrPassBuf[0] == '1' && qrPassBuf[1] == '2' &&
+                                    qrPassBuf[2] == '4' && qrPassBuf[3] == '5');
+                    if (correct) {
+                        Serial.println("[KPD] QR password correct — unlocking QR button");
+                        lcd->showMessage("QR Unlocked!", "Check website");
+                        firebase->setQrUnlocked(true);
+                    } else {
+                        Serial.println("[KPD] QR password incorrect");
+                        lcd->showMessage("Wrong pass", "Try again");
+                    }
+                    memset(qrPassBuf, 0, sizeof(qrPassBuf));
+                    qrPassLen = 0;
+                    delay(2000);
+                }
+            }
+            return;
+        }
+
+        // Normal keypad: '*' → QR password mode; '2'×3 → direct QR; else → PIN auth
+        if (key == '*') {
+            qrPassWaiting = true;
+            qrPassLen     = 0;
+            memset(qrPassBuf, 0, sizeof(qrPassBuf));
+            qrPassStartMs = now;
+            lcd->showMessage("QR Pass:", "");
+            return;
+        } else if (key == '2') {
             if (qrPressCount == 0 || now - qrFirstPressMs > QR_PRESS_WINDOW) {
                 qrPressCount   = 1;
                 qrFirstPressMs = now;
@@ -494,7 +560,7 @@ void loop() {
                 if (qrPressCount >= QR_PRESS_TARGET) {
                     qrPressCount = 0;
                     Serial.println("[KPD] Triple-press detected — requesting QR code");
-                    lcd->showMessage("QR requested", "Check email");
+                    lcd->showMessage("QR requested", "Check website");
                     firebase->requestQrCode();
                 } else {
                     lcd->showMessage("QR: press 1x", "more for QR");

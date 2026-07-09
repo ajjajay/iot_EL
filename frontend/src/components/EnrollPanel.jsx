@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useToast } from './ToastContainer.jsx';
 import { extractFeatures, averageFeatures } from '../utils/irisFeatures.js';
+import { useCameraDevices } from '../hooks/useCameraDevices.js';
 
 const AUTH_API_URL   = import.meta.env.VITE_AUTH_API_URL ?? '';
 const USE_REKOGNITION = !!AUTH_API_URL;
@@ -26,6 +27,8 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
   const [role,           setRole]           = useState('staff');
   const [allowedDevices, setAllowedDevices] = useState([]);
 
+  const { cameras, selectedId: camId, setSelectedId: setCamId, openStream } = useCameraDevices();
+
   const videoRef  = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -49,6 +52,7 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
   useEffect(() => () => stopStream(), []);
 
   function stopStream() {
+    streamRef.current?._stopMjpeg?.();
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
   }
@@ -92,7 +96,7 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
       return;
     }
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      const s = await openStream();
       streamRef.current = s;
       setCamPhase('live');
     } catch (err) {
@@ -274,6 +278,20 @@ export default function EnrollPanel({ devices, onSendEnroll, onWebcamEnroll }) {
 
           {camPhase === 'idle' && (
             <>
+              {cameras.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+                    Camera source
+                  </label>
+                  <select className="select" value={camId} onChange={e => setCamId(e.target.value)}>
+                    {cameras.map((cam, i) => (
+                      <option key={cam.deviceId} value={cam.deviceId}>
+                        {cam.label || `Camera ${i + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               {camErr && <p className="webcam-err">{camErr}</p>}
               <button className="btn btn-primary" onClick={openCamera}>Open Camera</button>
             </>

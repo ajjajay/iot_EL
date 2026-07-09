@@ -2,16 +2,23 @@ import { useRef, useState, useEffect } from 'react';
 import { extractFeatures } from '../utils/irisFeatures.js';
 import { matchAgainstUsers } from '../utils/biometricMatch.js';
 import { checkLiveness } from '../utils/livenessCheck.js';
+import { useCameraDevices } from '../hooks/useCameraDevices.js';
 
 const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL ?? '';
 
-// Captures the current video frame as a base64 JPEG at the video's native resolution.
+// Captures the current video frame as a base64 JPEG, capped at 640×480.
+// Rekognition works well at this resolution; native webcam frames (often 1080p+)
+// are much larger and add 10-40 s of cold-start latency.
 function captureJpegBase64(videoEl) {
-  const w   = videoEl.videoWidth  || 640;
-  const h   = videoEl.videoHeight || 480;
-  const tmp = document.createElement('canvas');
-  tmp.width  = w;
-  tmp.height = h;
+  const MAX_W = 640, MAX_H = 480;
+  const srcW  = videoEl.videoWidth  || 640;
+  const srcH  = videoEl.videoHeight || 480;
+  const scale = Math.min(MAX_W / srcW, MAX_H / srcH, 1);
+  const w     = Math.round(srcW * scale);
+  const h     = Math.round(srcH * scale);
+  const tmp   = document.createElement('canvas');
+  tmp.width   = w;
+  tmp.height  = h;
   tmp.getContext('2d').drawImage(videoEl, 0, 0, w, h);
   return tmp.toDataURL('image/jpeg', 0.85).split(',')[1];
 }
@@ -21,6 +28,8 @@ export default function WebcamAuth({ devices, users, onResult }) {
   const videoRef  = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
+
+  const { cameras, selectedId: camId, setSelectedId: setCamId, openStream } = useCameraDevices();
 
   const [deviceId,      setDeviceId]      = useState('');
   const [phase,         setPhase]         = useState('idle');
@@ -47,6 +56,7 @@ export default function WebcamAuth({ devices, users, onResult }) {
   useEffect(() => () => stopStream(), []);
 
   function stopStream() {
+    streamRef.current?._stopMjpeg?.();
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
   }
@@ -58,7 +68,7 @@ export default function WebcamAuth({ devices, users, onResult }) {
       return;
     }
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      const s = await openStream();
       streamRef.current = s;
       setPhase('live');
     } catch (err) {
@@ -274,6 +284,20 @@ export default function WebcamAuth({ devices, users, onResult }) {
 
       {phase === 'idle' && (
         <div className="webcam-idle">
+          {cameras.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+                Camera source
+              </label>
+              <select className="select" value={camId} onChange={e => setCamId(e.target.value)}>
+                {cameras.map((cam, i) => (
+                  <option key={cam.deviceId} value={cam.deviceId}>
+                    {cam.label || `Camera ${i + 1}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           {showNoUsersWarning && (
             <p className="webcam-warn">
               No webcam-enrolled users yet. Go to <strong>Users</strong> → Enroll New User → Laptop Camera tab to enroll yourself first.

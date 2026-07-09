@@ -24,8 +24,8 @@
 #include "StateManager.h"
 #include "ActuatorController.h"
 
-// MQTT broker port for TLS (standard AWS IoT Core port)
-static constexpr uint16_t AWS_MQTT_PORT = 8883;
+// Port 443 with ALPN "x-amzn-mqtt-ca" — works on hotspots that block 8883
+static constexpr uint16_t AWS_MQTT_PORT = 443;
 
 // JSON payload buffer — must be larger than the largest message we publish
 static constexpr uint16_t AWS_MQTT_BUFFER = 1024;
